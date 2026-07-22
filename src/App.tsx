@@ -9,6 +9,7 @@ import { LogsPage } from "./pages/LogsPage";
 import { BlacklistPage } from "./pages/BlacklistPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { LockScreen } from "./pages/LockScreen";
+import { UpdateChecker } from "./components/UpdateChecker";
 
 type Tab = "overview" | "profiles" | "campaigns" | "proxies" | "monitor" | "blacklist" | "logs" | "settings";
 
@@ -33,6 +34,7 @@ function App() {
 
   return (
     <div className="shell">
+      <UpdateChecker />
       <aside className="sidebar">
         <div className="brand">
           <span className="dot" />

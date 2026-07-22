@@ -30,6 +30,8 @@ async fn ping_sidecar(state: State<'_, Arc<AppState>>) -> Result<serde_json::Val
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir().expect("resolve app data dir");
             std::fs::create_dir_all(&app_data_dir).expect("create app data dir");

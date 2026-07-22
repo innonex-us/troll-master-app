@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "jarveeauto",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.jarveeauto.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,6 +38,14 @@
     "resources": {
       "../sidecar/dist": "sidecar/dist",
       "../sidecar/node_modules": "sidecar/node_modules"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEEzRTZFRjgyODI4MDg2NDMKUldSRGhvQ0NndS9tb3lRRUU1eFRGYW4vZm5KZ001QmoyREduUUdKWExGSzExUWdUR0ZRSi9IR1UK",
+      "endpoints": [
+        "https://github.com/innonex-us/jarvee/releases/latest/download/latest.json"
+      ]
     }
   }
 }

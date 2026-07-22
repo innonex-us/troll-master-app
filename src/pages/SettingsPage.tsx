@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, AppSettings } from "../api";
+import { checkForUpdate, installUpdate, type Update } from "../update";
 
 const APP_VERSION = "0.1.0";
 
@@ -18,6 +19,11 @@ export function SettingsPage() {
   const [clearStatus, setClearStatus] = useState("");
 
   const [pingStatus, setPingStatus] = useState("");
+
+  const [updateStatus, setUpdateStatus] = useState("");
+  const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const [progress, setProgress] = useState(-1);
 
   async function refresh() {
     try {
@@ -89,6 +95,33 @@ export function SettingsPage() {
       setPingStatus(result.pong ? "sidecar responding" : "unexpected response");
     } catch (err) {
       setPingStatus(`error: ${err}`);
+    }
+  }
+
+  async function checkUpdate() {
+    setUpdateStatus("checking…");
+    setPendingUpdate(null);
+    try {
+      const update = await checkForUpdate();
+      if (update) {
+        setPendingUpdate(update);
+        setUpdateStatus(`v${update.version} available`);
+      } else {
+        setUpdateStatus("you're on the latest version");
+      }
+    } catch (err) {
+      setUpdateStatus(`error: ${err}`);
+    }
+  }
+
+  async function installPendingUpdate() {
+    if (!pendingUpdate) return;
+    setInstalling(true);
+    try {
+      await installUpdate(pendingUpdate, setProgress);
+    } catch (err) {
+      setUpdateStatus(`error: ${err}`);
+      setInstalling(false);
     }
   }
 
@@ -236,6 +269,21 @@ export function SettingsPage() {
           {pingStatus && <span className="hint">{pingStatus}</span>}
         </div>
         <p className="hint">jarveeAuto v{APP_VERSION} · local automation engine</p>
+      </div>
+
+      <div className="panel">
+        <h3>Updates</h3>
+        <div className="row">
+          <button type="button" onClick={checkUpdate} disabled={installing}>
+            Check for Updates
+          </button>
+          {pendingUpdate && (
+            <button type="button" className="primary" onClick={installPendingUpdate} disabled={installing}>
+              {installing ? (progress >= 0 ? `Installing… ${progress}%` : "Installing…") : "Download & Install"}
+            </button>
+          )}
+          {updateStatus && <span className="hint">{updateStatus}</span>}
+        </div>
       </div>
     </div>
   );
