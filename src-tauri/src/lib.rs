@@ -29,6 +29,17 @@ async fn ping_sidecar(state: State<'_, Arc<AppState>>) -> Result<serde_json::Val
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Must be the first plugin registered. If the app is already running and
+        // the user opens it again (double-clicks the app, or a second install of
+        // a different version launches), this brings the existing window forward
+        // instead of starting a second process — so only one version can ever be
+        // actively running on a machine at a time.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())

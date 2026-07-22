@@ -32,8 +32,8 @@ const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: "monitor", label: "Monitor", icon: "◉" },
   { id: "blacklist", label: "Blacklist", icon: "⊘" },
   { id: "logs", label: "Logs", icon: "≡" },
+  { id: "changelog", label: "Changelog", icon: "↻" },
   { id: "settings", label: "Settings", icon: "⚙" },
-  { id: "changelog", label: "Changelog", icon: "🕐" },
 ];
 
 function App() {
@@ -80,8 +80,8 @@ function App() {
         {tab === "monitor" && <MonitorPage />}
         {tab === "blacklist" && <BlacklistPage />}
         {tab === "logs" && <LogsPage />}
-        {tab === "settings" && <SettingsPage />}
         {tab === "changelog" && <ChangelogPage />}
+        {tab === "settings" && <SettingsPage />}
       </main>
     </div>
   );
