@@ -17,6 +17,11 @@ pub struct Profile {
     pub status: String,
     pub activated_at: Option<String>,
     pub group_id: Option<String>,
+    pub device_name: String,
+    pub device_id: String,
+    /// Never exposes the encrypted password itself — just whether one is stored,
+    /// so the frontend can show "Auto Login" as available without any secret leaving the backend.
+    pub has_password: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -27,6 +32,8 @@ pub struct NewProfile {
     pub display_name: String,
     pub username: String,
     pub proxy_id: Option<String>,
+    #[serde(default)]
+    pub device_name: String,
 }
 
 fn row_to_profile(row: &rusqlite::Row) -> rusqlite::Result<Profile> {
@@ -45,6 +52,9 @@ fn row_to_profile(row: &rusqlite::Row) -> rusqlite::Result<Profile> {
         status: row.get("status")?,
         activated_at: row.get("activated_at")?,
         group_id: row.get("group_id")?,
+        device_name: row.get("device_name")?,
+        device_id: row.get("device_id")?,
+        has_password: row.get::<_, Option<String>>("login_password_enc")?.is_some(),
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
     })
@@ -57,9 +67,10 @@ pub fn insert_profile(
 ) -> rusqlite::Result<Profile> {
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
+    let device_id = crate::fingerprint::generate_device_id();
     conn.execute(
-        "INSERT INTO profiles (id, platform, display_name, username, proxy_id, timezone, locale, user_agent, viewport_width, viewport_height, storage_state_enc_path, status, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, 'needs_login', ?11, ?11)",
+        "INSERT INTO profiles (id, platform, display_name, username, proxy_id, timezone, locale, user_agent, viewport_width, viewport_height, storage_state_enc_path, status, device_name, device_id, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, 'needs_login', ?11, ?12, ?13, ?13)",
         params![
             id,
             new.platform,
@@ -71,6 +82,8 @@ pub fn insert_profile(
             fp.user_agent,
             fp.viewport_width,
             fp.viewport_height,
+            new.device_name,
+            device_id,
             now,
         ],
     )?;
@@ -129,6 +142,46 @@ pub fn set_profile_activated_now(conn: &Connection, id: &str) -> rusqlite::Resul
         params![now, id],
     )?;
     Ok(())
+}
+
+pub fn set_profile_device_name(conn: &Connection, id: &str, device_name: &str) -> rusqlite::Result<()> {
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE profiles SET device_name = ?1, updated_at = ?2 WHERE id = ?3",
+        params![device_name, now, id],
+    )?;
+    Ok(())
+}
+
+pub fn regenerate_device_id(conn: &Connection, id: &str) -> rusqlite::Result<String> {
+    let device_id = crate::fingerprint::generate_device_id();
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE profiles SET device_id = ?1, updated_at = ?2 WHERE id = ?3",
+        params![device_id, now, id],
+    )?;
+    Ok(device_id)
+}
+
+/// Stores an already-encrypted password blob (or clears it with `None`). Encryption
+/// happens one layer up, in the executor — this module just persists opaque ciphertext.
+pub fn set_login_password_enc(conn: &Connection, id: &str, enc: Option<&str>) -> rusqlite::Result<()> {
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE profiles SET login_password_enc = ?1, updated_at = ?2 WHERE id = ?3",
+        params![enc, now, id],
+    )?;
+    Ok(())
+}
+
+pub fn get_login_password_enc(conn: &Connection, id: &str) -> rusqlite::Result<Option<String>> {
+    conn.query_row(
+        "SELECT login_password_enc FROM profiles WHERE id = ?1",
+        params![id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map(|v| v.flatten())
 }
 
 pub fn set_profile_storage_state_path(

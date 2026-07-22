@@ -38,6 +38,15 @@ const VIEWPORTS: &[(i64, i64)] = &[
     (1280, 800),
 ];
 
+/// A synthetic per-profile device identifier, IMEI-shaped (15 digits) for
+/// familiarity. This is browser automation, not a mobile app — there's no real
+/// device behind it — so this exists purely so profiles can be organized/labeled
+/// as distinct "devices" in the UI, the same way Jarvee lets you tag accounts by device.
+pub fn generate_device_id() -> String {
+    let mut rng = rand::thread_rng();
+    (0..15).map(|_| rng.gen_range(0..10).to_string()).collect()
+}
+
 pub fn generate() -> Fingerprint {
     let mut rng = rand::thread_rng();
     let user_agent = USER_AGENTS.choose(&mut rng).unwrap().to_string();

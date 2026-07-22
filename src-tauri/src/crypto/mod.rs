@@ -73,3 +73,35 @@ pub fn decrypt_to_file(enc_path: &Path, out_path: &Path) -> std::io::Result<()> 
     std::fs::write(out_path, plaintext)?;
     Ok(())
 }
+
+/// Encrypts a short string (e.g. a stored login password) into a base64 blob
+/// (nonce prefix + ciphertext) using the same keychain-backed key as storage states.
+pub fn encrypt_string(plaintext: &str) -> Result<String, String> {
+    let cipher = cipher();
+    let mut nonce_bytes = [0u8; NONCE_LEN];
+    OsRng.fill_bytes(&mut nonce_bytes);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let ciphertext = cipher
+        .encrypt(nonce, plaintext.as_bytes())
+        .map_err(|e| e.to_string())?;
+
+    let mut out = Vec::with_capacity(NONCE_LEN + ciphertext.len());
+    out.extend_from_slice(&nonce_bytes);
+    out.extend_from_slice(&ciphertext);
+    Ok(base64::engine::general_purpose::STANDARD.encode(out))
+}
+
+pub fn decrypt_string(encoded: &str) -> Result<String, String> {
+    let data = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|e| e.to_string())?;
+    if data.len() < NONCE_LEN {
+        return Err("ciphertext too short".to_string());
+    }
+    let (nonce_bytes, ciphertext) = data.split_at(NONCE_LEN);
+    let nonce = Nonce::from_slice(nonce_bytes);
+    let cipher = cipher();
+    let plaintext = cipher.decrypt(nonce, ciphertext).map_err(|e| e.to_string())?;
+    String::from_utf8(plaintext).map_err(|e| e.to_string())
+}

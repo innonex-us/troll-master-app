@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState, type FormEvent } from "react";
 import { api, Platform, Profile, ProfileGroup, Proxy } from "../api";
 import { RulesPanel } from "./RulesPanel";
+import { ProfileManagePanel } from "./ProfileManagePanel";
 import { Badge } from "../components/Badge";
 
 export function ProfilesPage() {
@@ -8,7 +9,8 @@ export function ProfilesPage() {
   const [proxies, setProxies] = useState<Proxy[]>([]);
   const [groups, setGroups] = useState<ProfileGroup[]>([]);
   const [error, setError] = useState("");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedRules, setExpandedRules] = useState<string | null>(null);
+  const [expandedManage, setExpandedManage] = useState<string | null>(null);
   const [captureStatus, setCaptureStatus] = useState<Record<string, string>>({});
 
   const [platform, setPlatform] = useState<Platform>("instagram");
@@ -16,6 +18,7 @@ export function ProfilesPage() {
   const [username, setUsername] = useState("");
   const [proxyId, setProxyId] = useState<string>("");
   const [groupId, setGroupId] = useState<string>("");
+  const [deviceName, setDeviceName] = useState("");
 
   const [newGroupName, setNewGroupName] = useState("");
   const [groupFilter, setGroupFilter] = useState("");
@@ -48,6 +51,7 @@ export function ProfilesPage() {
         display_name: displayName,
         username,
         proxy_id: proxyId || null,
+        device_name: deviceName,
       });
       if (groupId) {
         await api.setProfileGroup(created.id, groupId);
@@ -56,6 +60,7 @@ export function ProfilesPage() {
       setUsername("");
       setProxyId("");
       setGroupId("");
+      setDeviceName("");
       await refresh();
     } catch (err) {
       setError(String(err));
@@ -186,6 +191,11 @@ export function ProfilesPage() {
             </option>
           ))}
         </select>
+        <input
+          placeholder="Device name (optional)"
+          value={deviceName}
+          onChange={(e) => setDeviceName(e.target.value)}
+        />
         <button type="submit" className="primary">
           Add Profile
         </button>
@@ -199,6 +209,7 @@ export function ProfilesPage() {
             <th>Username</th>
             <th>Platform</th>
             <th>Status</th>
+            <th>Device</th>
             <th>Group</th>
             <th>Proxy</th>
             <th>Login</th>
@@ -214,6 +225,10 @@ export function ProfilesPage() {
                 <td>{p.platform}</td>
                 <td>
                   <Badge status={p.status} />
+                </td>
+                <td>
+                  <div className="hint">{p.device_name || "unnamed"}</div>
+                  <div className="hint">{p.device_id}</div>
                 </td>
                 <td>
                   <select value={p.group_id ?? ""} onChange={(e) => assignGroup(p.id, e.target.value)}>
@@ -245,18 +260,34 @@ export function ProfilesPage() {
                   {captureStatus[p.id] && <div className="hint">{captureStatus[p.id]}</div>}
                 </td>
                 <td>
-                  <button type="button" onClick={() => setExpanded(expanded === p.id ? null : p.id)}>
-                    {expanded === p.id ? "Hide Rules" : "Rules"}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedRules(expandedRules === p.id ? null : p.id)}
+                  >
+                    {expandedRules === p.id ? "Hide Rules" : "Rules"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedManage(expandedManage === p.id ? null : p.id)}
+                  >
+                    {expandedManage === p.id ? "Hide Manage" : "Manage"}
                   </button>
                   <button type="button" className="danger" onClick={() => removeProfile(p.id)}>
                     Delete
                   </button>
                 </td>
               </tr>
-              {expanded === p.id && (
+              {expandedRules === p.id && (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <RulesPanel profileId={p.id} platform={p.platform} />
+                  </td>
+                </tr>
+              )}
+              {expandedManage === p.id && (
+                <tr>
+                  <td colSpan={9}>
+                    <ProfileManagePanel profile={p} onChanged={refresh} />
                   </td>
                 </tr>
               )}
@@ -264,7 +295,7 @@ export function ProfilesPage() {
           ))}
           {visibleProfiles.length === 0 && (
             <tr>
-              <td className="empty" colSpan={8}>
+              <td className="empty" colSpan={9}>
                 No profiles yet — add one above to get started.
               </td>
             </tr>

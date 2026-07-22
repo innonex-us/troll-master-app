@@ -225,6 +225,9 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     add_column_if_missing(conn, "profiles", "group_id", "TEXT")?;
     add_column_if_missing(conn, "campaigns", "enabled", "INTEGER NOT NULL DEFAULT 1")?;
     add_column_if_missing(conn, "campaigns", "tags", "TEXT NOT NULL DEFAULT '[]'")?;
+    add_column_if_missing(conn, "profiles", "device_name", "TEXT NOT NULL DEFAULT ''")?;
+    add_column_if_missing(conn, "profiles", "device_id", "TEXT NOT NULL DEFAULT ''")?;
+    add_column_if_missing(conn, "profiles", "login_password_enc", "TEXT")?;
     Ok(())
 }
 

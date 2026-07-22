@@ -447,3 +447,50 @@ pub async fn clear_old_logs_cmd(state: State<'_, Arc<AppState>>, days: i64) -> R
 pub async fn get_app_data_dir_cmd(state: State<'_, Arc<AppState>>) -> Result<String, String> {
     Ok(state.app_data_dir.to_string_lossy().to_string())
 }
+
+#[tauri::command]
+pub async fn set_profile_device_name_cmd(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    device_name: String,
+) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::set_profile_device_name(&conn, &id, &device_name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn regenerate_device_id_cmd(state: State<'_, Arc<AppState>>, id: String) -> Result<String, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::regenerate_device_id(&conn, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_profile_password_cmd(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    password: String,
+) -> Result<(), String> {
+    let encrypted = crate::crypto::encrypt_string(&password)?;
+    let conn = state.db.0.lock().unwrap();
+    db::set_login_password_enc(&conn, &id, Some(&encrypted)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn clear_profile_password_cmd(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::set_login_password_enc(&conn, &id, None).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn auto_login_cmd(state: State<'_, Arc<AppState>>, profile_id: String) -> Result<(), String> {
+    executor::auto_login(&state, &profile_id).await
+}
+
+#[tauri::command]
+pub async fn import_cookies_cmd(
+    state: State<'_, Arc<AppState>>,
+    profile_id: String,
+    cookies_json: String,
+) -> Result<(), String> {
+    executor::import_cookies(&state, &profile_id, &cookies_json).await
+}

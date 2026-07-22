@@ -22,6 +22,11 @@ export type LoginCaptureParams = {
   storageStatePlainPath: string;
 };
 
+export type AutoLoginParams = LoginCaptureParams & {
+  username: string;
+  password: string;
+};
+
 export type InstagramActionType =
   | "follow"
   | "unfollow"

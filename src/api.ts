@@ -27,6 +27,9 @@ export type Profile = {
   storage_state_enc_path: string | null;
   status: string;
   group_id: string | null;
+  device_name: string;
+  device_id: string;
+  has_password: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -36,6 +39,7 @@ export type NewProfile = {
   display_name: string;
   username: string;
   proxy_id: string | null;
+  device_name: string;
 };
 
 export type ProfileGroup = {
@@ -230,6 +234,15 @@ export const api = {
   setProfileProxy: (id: string, proxyId: string | null) =>
     invoke<void>("set_profile_proxy_cmd", { id, proxyId }),
   captureLogin: (profileId: string) => invoke<void>("capture_login_cmd", { profileId }),
+  setProfileDeviceName: (id: string, deviceName: string) =>
+    invoke<void>("set_profile_device_name_cmd", { id, deviceName }),
+  regenerateDeviceId: (id: string) => invoke<string>("regenerate_device_id_cmd", { id }),
+  setProfilePassword: (id: string, password: string) =>
+    invoke<void>("set_profile_password_cmd", { id, password }),
+  clearProfilePassword: (id: string) => invoke<void>("clear_profile_password_cmd", { id }),
+  autoLogin: (profileId: string) => invoke<void>("auto_login_cmd", { profileId }),
+  importCookies: (profileId: string, cookiesJson: string) =>
+    invoke<void>("import_cookies_cmd", { profileId, cookiesJson }),
 
   listProxies: () => invoke<Proxy[]>("list_proxies_cmd"),
   createProxy: (newProxy: NewProxy) => invoke<Proxy>("create_proxy_cmd", { newProxy }),
