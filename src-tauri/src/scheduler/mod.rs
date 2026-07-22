@@ -8,13 +8,9 @@ use tauri::{AppHandle, Emitter};
 use crate::state::AppState;
 use crate::{db, executor};
 
-const TICK_INTERVAL: Duration = Duration::from_secs(60);
-
-const BACKOFF_BASE_SECS: i64 = 300; // 5 min
-const BACKOFF_CAP_SECS: i64 = 6 * 3600; // 6 hours
-
 /// New accounts get a fraction of their configured daily_limit, ramping up over
 /// two weeks, to avoid tripping ban-rate heuristics on freshly-activated profiles.
+/// Skipped entirely (always 1.0) when warmup is disabled in Settings.
 fn warmup_multiplier(days_active: i64) -> f64 {
     match days_active {
         0 => 0.15,
@@ -25,7 +21,10 @@ fn warmup_multiplier(days_active: i64) -> f64 {
     }
 }
 
-fn effective_daily_limit(daily_limit: i64, profile: &db::Profile) -> i64 {
+fn effective_daily_limit(conn: &rusqlite::Connection, daily_limit: i64, profile: &db::Profile) -> i64 {
+    if !db::get_bool(conn, "warmup_enabled", true) {
+        return daily_limit.max(1);
+    }
     let days_active = profile
         .activated_at
         .as_deref()
@@ -47,7 +46,7 @@ fn still_in_backoff(backoff_until: &Option<String>) -> bool {
 /// Given when this (profile, action_type) last ran, decides whether this tick should
 /// attempt another run: hard-gates on min_delay_sec, then rolls dice scaled so the
 /// expected fire time is spread uniformly across [min_delay_sec, max_delay_sec].
-fn delay_gate_passes(last_at: &Option<String>, min_delay_sec: i64, max_delay_sec: i64) -> bool {
+fn delay_gate_passes(last_at: &Option<String>, min_delay_sec: i64, max_delay_sec: i64, tick_interval_secs: u64) -> bool {
     let Some(last_at) = last_at else { return true };
     let elapsed = match chrono::DateTime::parse_from_rfc3339(last_at) {
         Ok(t) => (Utc::now() - t.with_timezone(&Utc)).num_seconds(),
@@ -57,13 +56,16 @@ fn delay_gate_passes(last_at: &Option<String>, min_delay_sec: i64, max_delay_sec
         return false;
     }
     let window = (max_delay_sec - min_delay_sec).max(1) as f64;
-    let probability = (TICK_INTERVAL.as_secs() as f64 / window).min(1.0);
+    let probability = (tick_interval_secs as f64 / window).min(1.0);
     rand::thread_rng().gen::<f64>() <= probability
 }
 
-fn next_backoff_until(consecutive_errors: i64) -> String {
+fn next_backoff_until(conn: &rusqlite::Connection, consecutive_errors: i64) -> String {
+    let settings = db::get_settings(conn);
+    let base_secs = (settings.backoff_base_mins.max(1) * 60) as i64;
+    let cap_secs = (settings.backoff_cap_hours.max(1) * 3600) as i64;
     let exponent = consecutive_errors.clamp(0, 6);
-    let backoff_secs = (BACKOFF_BASE_SECS * (1i64 << exponent)).min(BACKOFF_CAP_SECS);
+    let backoff_secs = (base_secs * (1i64 << exponent)).min(cap_secs);
     (Utc::now() + chrono::Duration::seconds(backoff_secs)).to_rfc3339()
 }
 
@@ -83,15 +85,20 @@ fn track_follow_history(conn: &rusqlite::Connection, profile: &db::Profile, acti
     }
 }
 
-const MONITOR_REFRESH_INTERVAL_SECS: i64 = 30 * 60; // don't re-scrape a post more than every 30 min
-
 pub fn spawn(app_handle: AppHandle, state: Arc<AppState>) {
     tauri::async_runtime::spawn(async move {
-        let mut interval = tokio::time::interval(TICK_INTERVAL);
+        // Read once at startup: the tick interval is baked into the running timer,
+        // so a change in Settings takes effect after the next app restart.
+        let tick_interval_secs = {
+            let conn = state.db.0.lock().unwrap();
+            db::get_settings(&conn).scheduler_tick_secs.max(5) as u64
+        };
+
+        let mut interval = tokio::time::interval(Duration::from_secs(tick_interval_secs));
         loop {
             interval.tick().await;
-            tick_standalone_rules(&app_handle, &state).await;
-            tick_campaigns(&app_handle, &state).await;
+            tick_standalone_rules(&app_handle, &state, tick_interval_secs).await;
+            tick_campaigns(&app_handle, &state, tick_interval_secs).await;
             tick_monitoring(&state).await;
         }
     });
@@ -137,7 +144,7 @@ async fn refill_targets_if_low(
     }
 }
 
-async fn tick_standalone_rules(app_handle: &AppHandle, state: &Arc<AppState>) {
+async fn tick_standalone_rules(app_handle: &AppHandle, state: &Arc<AppState>, tick_interval_secs: u64) {
     let rules = {
         let conn = state.db.0.lock().unwrap();
         match db::list_enabled_rules(&conn) {
@@ -182,17 +189,18 @@ async fn tick_standalone_rules(app_handle: &AppHandle, state: &Arc<AppState>) {
             continue;
         }
 
-        let (count_today, last_at) = {
+        let (count_today, last_at, daily_limit) = {
             let conn = state.db.0.lock().unwrap();
             let count = db::count_today(&conn, &profile.id, &rule.action_type).unwrap_or(0);
             let last = db::last_executed_at(&conn, &profile.id, &rule.action_type).unwrap_or(None);
-            (count, last)
+            let limit = effective_daily_limit(&conn, rule.daily_limit, &profile);
+            (count, last, limit)
         };
 
-        if count_today >= effective_daily_limit(rule.daily_limit, &profile) {
+        if count_today >= daily_limit {
             continue;
         }
-        if !delay_gate_passes(&last_at, rule.min_delay_sec, rule.max_delay_sec) {
+        if !delay_gate_passes(&last_at, rule.min_delay_sec, rule.max_delay_sec, tick_interval_secs) {
             continue;
         }
 
@@ -223,7 +231,7 @@ async fn tick_standalone_rules(app_handle: &AppHandle, state: &Arc<AppState>) {
                     let _ = db::record_rule_success(&conn, &rule.id);
                 }
                 "error" => {
-                    let backoff_until = next_backoff_until(rule.consecutive_errors);
+                    let backoff_until = next_backoff_until(&conn, rule.consecutive_errors);
                     let _ = db::record_rule_error(&conn, &rule.id, &backoff_until);
                 }
                 "challenged" | "banned" => {
@@ -245,7 +253,7 @@ async fn tick_standalone_rules(app_handle: &AppHandle, state: &Arc<AppState>) {
     }
 }
 
-async fn tick_campaigns(app_handle: &AppHandle, state: &Arc<AppState>) {
+async fn tick_campaigns(app_handle: &AppHandle, state: &Arc<AppState>, tick_interval_secs: u64) {
     let active = {
         let conn = state.db.0.lock().unwrap();
         match db::list_active_campaign_states(&conn) {
@@ -294,17 +302,18 @@ async fn tick_campaigns(app_handle: &AppHandle, state: &Arc<AppState>) {
             continue;
         }
 
-        let (count_today, last_at) = {
+        let (count_today, last_at, daily_limit) = {
             let conn = state.db.0.lock().unwrap();
             let count = db::count_today(&conn, &profile.id, &rule.action_type).unwrap_or(0);
             let last = db::last_executed_at(&conn, &profile.id, &rule.action_type).unwrap_or(None);
-            (count, last)
+            let limit = effective_daily_limit(&conn, rule.daily_limit, &profile);
+            (count, last, limit)
         };
 
-        if count_today >= effective_daily_limit(rule.daily_limit, &profile) {
+        if count_today >= daily_limit {
             continue;
         }
-        if !delay_gate_passes(&last_at, rule.min_delay_sec, rule.max_delay_sec) {
+        if !delay_gate_passes(&last_at, rule.min_delay_sec, rule.max_delay_sec, tick_interval_secs) {
             continue;
         }
 
@@ -335,7 +344,7 @@ async fn tick_campaigns(app_handle: &AppHandle, state: &Arc<AppState>) {
                     let _ = db::record_state_success(&conn, &cstate.id);
                 }
                 "error" => {
-                    let backoff_until = next_backoff_until(cstate.consecutive_errors);
+                    let backoff_until = next_backoff_until(&conn, cstate.consecutive_errors);
                     let _ = db::record_state_error(&conn, &cstate.id, &backoff_until);
                 }
                 "challenged" | "banned" => {
@@ -372,9 +381,10 @@ async fn tick_monitoring(state: &Arc<AppState>) {
     for post in posts {
         let due = {
             let conn = state.db.0.lock().unwrap();
+            let refresh_secs = db::get_settings(&conn).monitor_refresh_mins.max(1) * 60;
             match db::latest_snapshot_at(&conn, &post.id) {
                 Ok(Some(last)) => match chrono::DateTime::parse_from_rfc3339(&last) {
-                    Ok(t) => (Utc::now() - t.with_timezone(&Utc)).num_seconds() >= MONITOR_REFRESH_INTERVAL_SECS,
+                    Ok(t) => (Utc::now() - t.with_timezone(&Utc)).num_seconds() >= refresh_secs,
                     Err(_) => true,
                 },
                 Ok(None) => true,

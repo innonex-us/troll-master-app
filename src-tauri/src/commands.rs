@@ -421,3 +421,29 @@ pub async fn scrape_post_now_cmd(
     db::insert_snapshot(&conn, &monitored_post_id, &metrics).map_err(|e| e.to_string())?;
     Ok(metrics)
 }
+
+#[tauri::command]
+pub async fn get_settings_cmd(state: State<'_, Arc<AppState>>) -> Result<db::AppSettings, String> {
+    let conn = state.db.0.lock().unwrap();
+    Ok(db::get_settings(&conn))
+}
+
+#[tauri::command]
+pub async fn save_settings_cmd(
+    state: State<'_, Arc<AppState>>,
+    settings: db::AppSettings,
+) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::save_settings(&conn, &settings).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn clear_old_logs_cmd(state: State<'_, Arc<AppState>>, days: i64) -> Result<usize, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::clear_old_logs(&conn, days).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_app_data_dir_cmd(state: State<'_, Arc<AppState>>) -> Result<String, String> {
+    Ok(state.app_data_dir.to_string_lossy().to_string())
+}

@@ -9,6 +9,7 @@ mod monitoring;
 mod profiles;
 mod proxies;
 mod rules;
+mod settings;
 
 pub use blacklist::*;
 pub use campaign_rule_state::*;
@@ -21,6 +22,7 @@ pub use monitoring::*;
 pub use profiles::*;
 pub use proxies::*;
 pub use rules::*;
+pub use settings::*;
 
 use rusqlite::Connection;
 use std::path::Path;
@@ -178,6 +180,11 @@ CREATE INDEX IF NOT EXISTS idx_campaign_rules_campaign ON campaign_rules(campaig
 CREATE INDEX IF NOT EXISTS idx_campaign_rule_state_profile ON campaign_rule_state(profile_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_rule_state_rule ON campaign_rule_state(campaign_rule_id);
 CREATE INDEX IF NOT EXISTS idx_monitored_snapshots_post ON monitored_post_snapshots(monitored_post_id, captured_at);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 "#;
 
 fn column_exists(conn: &Connection, table: &str, column: &str) -> rusqlite::Result<bool> {

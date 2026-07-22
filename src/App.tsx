@@ -7,9 +7,10 @@ import { ProxiesPage } from "./pages/ProxiesPage";
 import { MonitorPage } from "./pages/MonitorPage";
 import { LogsPage } from "./pages/LogsPage";
 import { BlacklistPage } from "./pages/BlacklistPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { LockScreen } from "./pages/LockScreen";
 
-type Tab = "overview" | "profiles" | "campaigns" | "proxies" | "monitor" | "blacklist" | "logs";
+type Tab = "overview" | "profiles" | "campaigns" | "proxies" | "monitor" | "blacklist" | "logs" | "settings";
 
 const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: "overview", label: "Overview", icon: "◆" },
@@ -19,6 +20,7 @@ const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: "monitor", label: "Monitor", icon: "◉" },
   { id: "blacklist", label: "Blacklist", icon: "⊘" },
   { id: "logs", label: "Logs", icon: "≡" },
+  { id: "settings", label: "Settings", icon: "⚙" },
 ];
 
 function App() {
@@ -59,6 +61,7 @@ function App() {
         {tab === "monitor" && <MonitorPage />}
         {tab === "blacklist" && <BlacklistPage />}
         {tab === "logs" && <LogsPage />}
+        {tab === "settings" && <SettingsPage />}
       </main>
     </div>
   );

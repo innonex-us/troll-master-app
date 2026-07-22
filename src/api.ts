@@ -136,6 +136,14 @@ export type MonitoredPostSnapshot = PostMetrics & {
   captured_at: string;
 };
 
+export type AppSettings = {
+  scheduler_tick_secs: number;
+  monitor_refresh_mins: number;
+  backoff_base_mins: number;
+  backoff_cap_hours: number;
+  warmup_enabled: boolean;
+};
+
 export type BlacklistEntry = {
   id: string;
   profile_id: string | null;
@@ -282,4 +290,10 @@ export const api = {
   hasMasterPassword: () => invoke<boolean>("has_master_password_cmd"),
   setMasterPassword: (password: string) => invoke<void>("set_master_password_cmd", { password }),
   verifyMasterPassword: (password: string) => invoke<boolean>("verify_master_password_cmd", { password }),
+
+  getSettings: () => invoke<AppSettings>("get_settings_cmd"),
+  saveSettings: (settings: AppSettings) => invoke<void>("save_settings_cmd", { settings }),
+  clearOldLogs: (days: number) => invoke<number>("clear_old_logs_cmd", { days }),
+  getAppDataDir: () => invoke<string>("get_app_data_dir_cmd"),
+  pingSidecar: () => invoke<{ pong: boolean; ts: number }>("ping_sidecar"),
 };

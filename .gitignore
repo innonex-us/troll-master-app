@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# Rust build output
+src-tauri/target
+
+# Vendored Node runtime for packaging (too large for git, ~100MB+).
+# Regenerate with: cp "$(which node)" src-tauri/binaries/jarveeauto-node-<target-triple>
+src-tauri/binaries
+
+# Secrets
+.env
+.env.*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
