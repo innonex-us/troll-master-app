@@ -1,14 +1,16 @@
-import { Fragment, useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { api, Campaign, Profile, ProfileGroup } from "../api";
 import { CampaignRulesPanel } from "./CampaignRulesPanel";
 import { Badge } from "../components/Badge";
+import { Modal } from "../components/Modal";
 
 export function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [groups, setGroups] = useState<ProfileGroup[]>([]);
   const [error, setError] = useState("");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [manageCampaign, setManageCampaign] = useState<Campaign | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
   const [enrolled, setEnrolled] = useState<Record<string, Set<string>>>({});
 
   const [name, setName] = useState("");
@@ -44,8 +46,9 @@ export function CampaignsPage() {
   }
 
   useEffect(() => {
-    if (expanded) refreshEnrollment(expanded);
-  }, [expanded]);
+    if (manageCampaign) refreshEnrollment(manageCampaign.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manageCampaign?.id]);
 
   async function addCampaign(e: FormEvent) {
     e.preventDefault();
@@ -58,6 +61,7 @@ export function CampaignsPage() {
       setName("");
       setDescription("");
       setTags("");
+      setShowAdd(false);
       await refresh();
     } catch (err) {
       setError(String(err));
@@ -108,30 +112,11 @@ export function CampaignsPage() {
             every enrolled profile immediately.
           </div>
         </div>
+        <button type="button" className="primary" onClick={() => setShowAdd(true)}>
+          + Create Campaign
+        </button>
       </div>
       {error && <p className="error">{error}</p>}
-
-      <form className="row panel" onSubmit={addCampaign}>
-        <input
-          placeholder="Campaign name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <input
-          placeholder="Description (optional)"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-        <input
-          placeholder="tags, comma separated"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-        />
-        <button type="submit" className="primary">
-          Create Campaign
-        </button>
-      </form>
 
       <div className="panel">
         <table className="mini-table">
@@ -146,109 +131,131 @@ export function CampaignsPage() {
           </thead>
           <tbody>
             {campaigns.map((c) => (
-              <Fragment key={c.id}>
-                <tr>
-                  <td>{c.name}</td>
-                  <td>{c.tags.join(", ")}</td>
-                  <td>
-                    <Badge status={c.enabled ? "active" : "paused"} />
-                  </td>
-                  <td>{enrolled[c.id]?.size ?? "—"}</td>
-                  <td>
-                    <button type="button" onClick={() => toggleCampaignEnabled(c)}>
-                      {c.enabled ? "Stop" : "Start"}
-                    </button>
-                    <button type="button" onClick={() => resetCampaign(c.id)}>
-                      Reset
-                    </button>
-                    <button type="button" onClick={() => retryFailed(c.id)}>
-                      Retry Failed
-                    </button>
-                    <button type="button" onClick={() => setExpanded(expanded === c.id ? null : c.id)}>
-                      {expanded === c.id ? "Hide" : "Manage"}
-                    </button>
-                    <button type="button" className="danger" onClick={() => removeCampaign(c.id)}>
-                      Delete
-                    </button>
-                    {actionStatus[c.id] && <div className="hint">{actionStatus[c.id]}</div>}
-                  </td>
-                </tr>
-                {expanded === c.id && (
-                  <tr>
-                    <td colSpan={5}>
-                      <CampaignRulesPanel campaignId={c.id} />
-
-                      <div className="rules-panel">
-                        <h4>Enrolled Profiles</h4>
-                        <p className="hint">
-                          Checking a profile enrolls it in every template rule above (skipping any
-                          action not supported on its platform). Unchecking removes it from all of
-                          them.
-                        </p>
-                        <div className="row">
-                          <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)}>
-                            <option value="">All profiles</option>
-                            {groups.map((g) => (
-                              <option key={g.id} value={g.id}>
-                                {g.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <table className="mini-table">
-                          <thead>
-                            <tr>
-                              <th></th>
-                              <th>Name</th>
-                              <th>Platform</th>
-                              <th>Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {visibleProfiles.map((p) => {
-                              const isEnrolled = enrolled[c.id]?.has(p.id) ?? false;
-                              return (
-                                <tr key={p.id}>
-                                  <td>
-                                    <input
-                                      type="checkbox"
-                                      checked={isEnrolled}
-                                      onChange={() => toggleEnroll(c.id, p.id, isEnrolled)}
-                                    />
-                                  </td>
-                                  <td>{p.display_name}</td>
-                                  <td>{p.platform}</td>
-                                  <td>
-                                    <Badge status={p.status} />
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                            {visibleProfiles.length === 0 && (
-                              <tr>
-                                <td className="empty" colSpan={4}>
-                                  No profiles match.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
+              <tr key={c.id}>
+                <td>{c.name}</td>
+                <td>{c.tags.join(", ")}</td>
+                <td>
+                  <Badge status={c.enabled ? "active" : "paused"} />
+                </td>
+                <td>{enrolled[c.id]?.size ?? "—"}</td>
+                <td>
+                  <button type="button" onClick={() => toggleCampaignEnabled(c)}>
+                    {c.enabled ? "Stop" : "Start"}
+                  </button>
+                  <button type="button" onClick={() => resetCampaign(c.id)}>
+                    Reset
+                  </button>
+                  <button type="button" onClick={() => retryFailed(c.id)}>
+                    Retry Failed
+                  </button>
+                  <button type="button" onClick={() => setManageCampaign(c)}>
+                    Manage
+                  </button>
+                  <button type="button" className="danger" onClick={() => removeCampaign(c.id)}>
+                    Delete
+                  </button>
+                  {actionStatus[c.id] && <div className="hint">{actionStatus[c.id]}</div>}
+                </td>
+              </tr>
             ))}
             {campaigns.length === 0 && (
               <tr>
                 <td className="empty" colSpan={5}>
-                  No campaigns yet — create one above.
+                  No campaigns yet — create one to get started.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {showAdd && (
+        <Modal title="Create Campaign" onClose={() => setShowAdd(false)}>
+          <form className="row" onSubmit={addCampaign}>
+            <input
+              placeholder="Campaign name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <input
+              placeholder="Description (optional)"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            <input
+              placeholder="tags, comma separated"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+            />
+            <button type="submit" className="primary">
+              Create Campaign
+            </button>
+          </form>
+        </Modal>
+      )}
+
+      {manageCampaign && (
+        <Modal title={`Manage — ${manageCampaign.name}`} onClose={() => setManageCampaign(null)} wide>
+          <CampaignRulesPanel campaignId={manageCampaign.id} />
+
+          <div className="rules-panel">
+            <h4>Enrolled Profiles</h4>
+            <p className="hint">
+              Checking a profile enrolls it in every template rule above (skipping any action not
+              supported on its platform). Unchecking removes it from all of them.
+            </p>
+            <div className="row">
+              <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)}>
+                <option value="">All profiles</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <table className="mini-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Name</th>
+                  <th>Platform</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleProfiles.map((p) => {
+                  const isEnrolled = enrolled[manageCampaign.id]?.has(p.id) ?? false;
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={isEnrolled}
+                          onChange={() => toggleEnroll(manageCampaign.id, p.id, isEnrolled)}
+                        />
+                      </td>
+                      <td>{p.display_name}</td>
+                      <td>{p.platform}</td>
+                      <td>
+                        <Badge status={p.status} />
+                      </td>
+                    </tr>
+                  );
+                })}
+                {visibleProfiles.length === 0 && (
+                  <tr>
+                    <td className="empty" colSpan={4}>
+                      No profiles match.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

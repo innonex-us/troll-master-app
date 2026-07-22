@@ -1,16 +1,18 @@
-import { Fragment, useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { api, Platform, Profile, ProfileGroup, Proxy } from "../api";
 import { RulesPanel } from "./RulesPanel";
 import { ProfileManagePanel } from "./ProfileManagePanel";
 import { Badge } from "../components/Badge";
+import { Modal } from "../components/Modal";
 
 export function ProfilesPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [proxies, setProxies] = useState<Proxy[]>([]);
   const [groups, setGroups] = useState<ProfileGroup[]>([]);
   const [error, setError] = useState("");
-  const [expandedRules, setExpandedRules] = useState<string | null>(null);
-  const [expandedManage, setExpandedManage] = useState<string | null>(null);
+  const [rulesModal, setRulesModal] = useState<Profile | null>(null);
+  const [manageModal, setManageModal] = useState<Profile | null>(null);
+  const [showAddProfile, setShowAddProfile] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<Record<string, string>>({});
 
   const [platform, setPlatform] = useState<Platform>("instagram");
@@ -43,6 +45,13 @@ export function ProfilesPage() {
     refresh();
   }, []);
 
+  // keep modal profile data in sync after actions elsewhere refresh the list
+  useEffect(() => {
+    if (rulesModal) setRulesModal(profiles.find((p) => p.id === rulesModal.id) ?? null);
+    if (manageModal) setManageModal(profiles.find((p) => p.id === manageModal.id) ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profiles]);
+
   async function addProfile(e: FormEvent) {
     e.preventDefault();
     try {
@@ -61,6 +70,7 @@ export function ProfilesPage() {
       setProxyId("");
       setGroupId("");
       setDeviceName("");
+      setShowAddProfile(false);
       await refresh();
     } catch (err) {
       setError(String(err));
@@ -119,6 +129,9 @@ export function ProfilesPage() {
           <h1>Profiles</h1>
           <div className="sub">Social accounts under management</div>
         </div>
+        <button type="button" className="primary" onClick={() => setShowAddProfile(true)}>
+          + Add Profile
+        </button>
       </div>
       {error && <p className="error">{error}</p>}
 
@@ -157,50 +170,6 @@ export function ProfilesPage() {
         )}
       </div>
 
-      <form className="row panel" onSubmit={addProfile}>
-        <select value={platform} onChange={(e) => setPlatform(e.target.value as Platform)}>
-          <option value="instagram">Instagram</option>
-          <option value="twitter">Twitter/X</option>
-          <option value="facebook">Facebook</option>
-        </select>
-        <input
-          placeholder="Display name"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          required
-        />
-        <input
-          placeholder="Username (on platform)"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-        />
-        <select value={proxyId} onChange={(e) => setProxyId(e.target.value)}>
-          <option value="">No proxy</option>
-          {proxies.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
-        <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-          <option value="">No group</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
-        <input
-          placeholder="Device name (optional)"
-          value={deviceName}
-          onChange={(e) => setDeviceName(e.target.value)}
-        />
-        <button type="submit" className="primary">
-          Add Profile
-        </button>
-      </form>
-
       <div className="panel">
       <table className="mini-table">
         <thead>
@@ -218,91 +187,126 @@ export function ProfilesPage() {
         </thead>
         <tbody>
           {visibleProfiles.map((p) => (
-            <Fragment key={p.id}>
-              <tr>
-                <td>{p.display_name}</td>
-                <td>{p.username}</td>
-                <td>{p.platform}</td>
-                <td>
-                  <Badge status={p.status} />
-                </td>
-                <td>
-                  <div className="hint">{p.device_name || "unnamed"}</div>
-                  <div className="hint">{p.device_id}</div>
-                </td>
-                <td>
-                  <select value={p.group_id ?? ""} onChange={(e) => assignGroup(p.id, e.target.value)}>
-                    <option value="">No group</option>
-                    {groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <select
-                    value={p.proxy_id ?? ""}
-                    onChange={(e) => assignProxy(p.id, e.target.value)}
-                  >
-                    <option value="">No proxy</option>
-                    {proxies.map((px) => (
-                      <option key={px.id} value={px.id}>
-                        {px.label}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <button type="button" onClick={() => captureLogin(p.id)}>
-                    Capture Login
-                  </button>
-                  {captureStatus[p.id] && <div className="hint">{captureStatus[p.id]}</div>}
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedRules(expandedRules === p.id ? null : p.id)}
-                  >
-                    {expandedRules === p.id ? "Hide Rules" : "Rules"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedManage(expandedManage === p.id ? null : p.id)}
-                  >
-                    {expandedManage === p.id ? "Hide Manage" : "Manage"}
-                  </button>
-                  <button type="button" className="danger" onClick={() => removeProfile(p.id)}>
-                    Delete
-                  </button>
-                </td>
-              </tr>
-              {expandedRules === p.id && (
-                <tr>
-                  <td colSpan={9}>
-                    <RulesPanel profileId={p.id} platform={p.platform} />
-                  </td>
-                </tr>
-              )}
-              {expandedManage === p.id && (
-                <tr>
-                  <td colSpan={9}>
-                    <ProfileManagePanel profile={p} onChanged={refresh} />
-                  </td>
-                </tr>
-              )}
-            </Fragment>
+            <tr key={p.id}>
+              <td>{p.display_name}</td>
+              <td>{p.username}</td>
+              <td>{p.platform}</td>
+              <td>
+                <Badge status={p.status} />
+              </td>
+              <td>
+                <div className="hint">{p.device_name || "unnamed"}</div>
+                <div className="hint">{p.device_id}</div>
+              </td>
+              <td>
+                <select value={p.group_id ?? ""} onChange={(e) => assignGroup(p.id, e.target.value)}>
+                  <option value="">No group</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td>
+                <select value={p.proxy_id ?? ""} onChange={(e) => assignProxy(p.id, e.target.value)}>
+                  <option value="">No proxy</option>
+                  {proxies.map((px) => (
+                    <option key={px.id} value={px.id}>
+                      {px.label}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td>
+                <button type="button" onClick={() => captureLogin(p.id)}>
+                  Capture Login
+                </button>
+                {captureStatus[p.id] && <div className="hint">{captureStatus[p.id]}</div>}
+              </td>
+              <td>
+                <button type="button" onClick={() => setRulesModal(p)}>
+                  Rules
+                </button>
+                <button type="button" onClick={() => setManageModal(p)}>
+                  Manage
+                </button>
+                <button type="button" className="danger" onClick={() => removeProfile(p.id)}>
+                  Delete
+                </button>
+              </td>
+            </tr>
           ))}
           {visibleProfiles.length === 0 && (
             <tr>
               <td className="empty" colSpan={9}>
-                No profiles yet — add one above to get started.
+                No profiles yet — add one to get started.
               </td>
             </tr>
           )}
         </tbody>
       </table>
       </div>
+
+      {showAddProfile && (
+        <Modal title="Add Profile" onClose={() => setShowAddProfile(false)}>
+          <form className="row" onSubmit={addProfile}>
+            <select value={platform} onChange={(e) => setPlatform(e.target.value as Platform)}>
+              <option value="instagram">Instagram</option>
+              <option value="twitter">Twitter/X</option>
+              <option value="facebook">Facebook</option>
+            </select>
+            <input
+              placeholder="Display name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              required
+            />
+            <input
+              placeholder="Username (on platform)"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+            />
+            <select value={proxyId} onChange={(e) => setProxyId(e.target.value)}>
+              <option value="">No proxy</option>
+              {proxies.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+              <option value="">No group</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+            <input
+              placeholder="Device name (optional)"
+              value={deviceName}
+              onChange={(e) => setDeviceName(e.target.value)}
+            />
+            <button type="submit" className="primary">
+              Add Profile
+            </button>
+          </form>
+        </Modal>
+      )}
+
+      {rulesModal && (
+        <Modal title={`Rules — ${rulesModal.display_name}`} onClose={() => setRulesModal(null)} wide>
+          <RulesPanel profileId={rulesModal.id} platform={rulesModal.platform} />
+        </Modal>
+      )}
+
+      {manageModal && (
+        <Modal title={`Manage — ${manageModal.display_name}`} onClose={() => setManageModal(null)} wide>
+          <ProfileManagePanel profile={manageModal} onChanged={refresh} />
+        </Modal>
+      )}
     </div>
   );
 }

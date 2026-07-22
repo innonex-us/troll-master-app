@@ -1,9 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, Proxy } from "../api";
+import { Modal } from "../components/Modal";
 
 export function ProxiesPage() {
   const [proxies, setProxies] = useState<Proxy[]>([]);
   const [error, setError] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
 
   const [label, setLabel] = useState("");
   const [protocol, setProtocol] = useState("http");
@@ -40,6 +42,7 @@ export function ProxiesPage() {
       setHost("");
       setProxyUser("");
       setProxyPass("");
+      setShowAdd(false);
       await refresh();
     } catch (err) {
       setError(String(err));
@@ -58,38 +61,11 @@ export function ProxiesPage() {
           <h1>Proxies</h1>
           <div className="sub">Assign one proxy per profile to keep sessions isolated</div>
         </div>
+        <button type="button" className="primary" onClick={() => setShowAdd(true)}>
+          + Add Proxy
+        </button>
       </div>
       {error && <p className="error">{error}</p>}
-
-      <form className="row panel" onSubmit={addProxy}>
-        <input placeholder="Label" value={label} onChange={(e) => setLabel(e.target.value)} required />
-        <select value={protocol} onChange={(e) => setProtocol(e.target.value)}>
-          <option value="http">HTTP</option>
-          <option value="socks5">SOCKS5</option>
-        </select>
-        <input placeholder="Host" value={host} onChange={(e) => setHost(e.target.value)} required />
-        <input
-          type="number"
-          placeholder="Port"
-          value={port}
-          onChange={(e) => setPort(Number(e.target.value))}
-          required
-        />
-        <input
-          placeholder="Username (optional)"
-          value={proxyUser}
-          onChange={(e) => setProxyUser(e.target.value)}
-        />
-        <input
-          placeholder="Password (optional)"
-          type="password"
-          value={proxyPass}
-          onChange={(e) => setProxyPass(e.target.value)}
-        />
-        <button type="submit" className="primary">
-          Add Proxy
-        </button>
-      </form>
 
       <div className="panel">
       <table className="mini-table">
@@ -119,13 +95,47 @@ export function ProxiesPage() {
           {proxies.length === 0 && (
             <tr>
               <td className="empty" colSpan={5}>
-                No proxies yet — add one above.
+                No proxies yet — add one to get started.
               </td>
             </tr>
           )}
         </tbody>
       </table>
       </div>
+
+      {showAdd && (
+        <Modal title="Add Proxy" onClose={() => setShowAdd(false)}>
+          <form className="row" onSubmit={addProxy}>
+            <input placeholder="Label" value={label} onChange={(e) => setLabel(e.target.value)} required />
+            <select value={protocol} onChange={(e) => setProtocol(e.target.value)}>
+              <option value="http">HTTP</option>
+              <option value="socks5">SOCKS5</option>
+            </select>
+            <input placeholder="Host" value={host} onChange={(e) => setHost(e.target.value)} required />
+            <input
+              type="number"
+              placeholder="Port"
+              value={port}
+              onChange={(e) => setPort(Number(e.target.value))}
+              required
+            />
+            <input
+              placeholder="Username (optional)"
+              value={proxyUser}
+              onChange={(e) => setProxyUser(e.target.value)}
+            />
+            <input
+              placeholder="Password (optional)"
+              type="password"
+              value={proxyPass}
+              onChange={(e) => setProxyPass(e.target.value)}
+            />
+            <button type="submit" className="primary">
+              Add Proxy
+            </button>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

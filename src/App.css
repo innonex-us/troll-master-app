@@ -581,6 +581,75 @@ button.ghost {
   color: var(--text-faint);
 }
 
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 6vh 20px;
+  z-index: 100;
+  animation: fade-in 0.12s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-dialog {
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 640px;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-dialog.wide {
+  max-width: 920px;
+}
+
+.modal-header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-raised);
+  z-index: 1;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 15px;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+}
+
+.modal-close {
+  font-size: 20px;
+  line-height: 1;
+  padding: 2px 8px;
+  color: var(--text-dim);
+}
+
+.modal-close:hover {
+  color: var(--err);
+  border-color: transparent;
+}
+
+.modal-body {
+  padding: 18px;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
