@@ -1,67 +1,51 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
+import { OverviewPage } from "./pages/OverviewPage";
+import { ProfilesPage } from "./pages/ProfilesPage";
+import { ProxiesPage } from "./pages/ProxiesPage";
+import { LogsPage } from "./pages/LogsPage";
+
+type Tab = "overview" | "profiles" | "proxies" | "logs";
+
+const NAV: { id: Tab; label: string; icon: string }[] = [
+  { id: "overview", label: "Overview", icon: "◆" },
+  { id: "profiles", label: "Profiles", icon: "▣" },
+  { id: "proxies", label: "Proxies", icon: "◈" },
+  { id: "logs", label: "Logs", icon: "≡" },
+];
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-  const [sidecarMsg, setSidecarMsg] = useState("");
-
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
-
-  async function pingSidecar() {
-    try {
-      const result = await invoke("ping_sidecar");
-      setSidecarMsg(`sidecar responded: ${JSON.stringify(result)}`);
-    } catch (err) {
-      setSidecarMsg(`sidecar error: ${err}`);
-    }
-  }
+  const [tab, setTab] = useState<Tab>("overview");
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="dot" />
+          JARVEE//AUTO
+        </div>
+        <nav className="nav">
+          {NAV.map((item) => (
+            <button
+              key={item.id}
+              className={tab === item.id ? "active" : ""}
+              onClick={() => setTab(item.id)}
+            >
+              <span className="icon">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-footer">v0.1.0 · local engine</div>
+      </aside>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-
-      <div className="row">
-        <button type="button" onClick={pingSidecar}>
-          Ping Sidecar
-        </button>
-      </div>
-      <p>{sidecarMsg}</p>
-    </main>
+      <main className="content">
+        {tab === "overview" && <OverviewPage />}
+        {tab === "profiles" && <ProfilesPage />}
+        {tab === "proxies" && <ProxiesPage />}
+        {tab === "logs" && <LogsPage />}
+      </main>
+    </div>
   );
 }
 

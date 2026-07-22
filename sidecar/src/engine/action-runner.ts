@@ -1,6 +1,9 @@
 import { closeContext, openContext } from "./browser.js";
+import { detectIssue } from "./detection.js";
 import * as instagram from "../platforms/instagram/actions.js";
 import * as twitter from "../platforms/twitter/actions.js";
+import { instagramConfig } from "../platforms/instagram/config.js";
+import { twitterConfig } from "../platforms/twitter/config.js";
 import type { ActionResult, ActionRunParams } from "./types.js";
 
 function pickComment(pool?: string[]): string {
@@ -19,6 +22,13 @@ export async function runAction(params: ActionRunParams): Promise<ActionResult> 
   try {
     const page = await opened.context.newPage();
     const mod = params.platform === "instagram" ? instagram : twitter;
+    const baseUrl = params.platform === "instagram" ? instagramConfig.baseUrl : twitterConfig.baseUrl;
+
+    await page.goto(baseUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
+    const issue = await detectIssue(page, params.platform);
+    if (issue) {
+      return { status: issue.issue, message: issue.detail };
+    }
 
     let result: ActionResult;
     switch (params.actionType) {

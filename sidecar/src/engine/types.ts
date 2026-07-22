@@ -34,6 +34,6 @@ export type ActionRunParams = {
 };
 
 export type ActionResult = {
-  status: "success" | "error" | "skipped";
+  status: "success" | "error" | "skipped" | "challenged" | "banned";
   message: string;
 };

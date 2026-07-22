@@ -13,6 +13,12 @@ pub struct ActionRule {
     pub target_source: Vec<String>,
     pub target_cursor: i64,
     pub comment_pool: Vec<String>,
+    /// "explicit" (user-provided list) | "hashtag" | "followers_of"
+    pub source_type: String,
+    /// hashtag or seed username used to auto-refill target_source when source_type != explicit
+    pub source_seed: String,
+    pub consecutive_errors: i64,
+    pub backoff_until: Option<String>,
     pub created_at: String,
 }
 
@@ -26,6 +32,14 @@ pub struct NewActionRule {
     pub target_source: Vec<String>,
     #[serde(default)]
     pub comment_pool: Vec<String>,
+    #[serde(default = "default_source_type")]
+    pub source_type: String,
+    #[serde(default)]
+    pub source_seed: String,
+}
+
+fn default_source_type() -> String {
+    "explicit".to_string()
 }
 
 fn row_to_rule(row: &rusqlite::Row) -> rusqlite::Result<ActionRule> {
@@ -42,6 +56,10 @@ fn row_to_rule(row: &rusqlite::Row) -> rusqlite::Result<ActionRule> {
         target_source: serde_json::from_str(&target_source).unwrap_or_default(),
         target_cursor: row.get("target_cursor")?,
         comment_pool: serde_json::from_str(&comment_pool).unwrap_or_default(),
+        source_type: row.get("source_type")?,
+        source_seed: row.get("source_seed")?,
+        consecutive_errors: row.get("consecutive_errors")?,
+        backoff_until: row.get("backoff_until")?,
         created_at: row.get("created_at")?,
     })
 }
@@ -52,9 +70,21 @@ pub fn insert_rule(conn: &Connection, new: &NewActionRule) -> rusqlite::Result<A
     let target_source = serde_json::to_string(&new.target_source).unwrap();
     let comment_pool = serde_json::to_string(&new.comment_pool).unwrap();
     conn.execute(
-        "INSERT INTO action_rules (id, profile_id, action_type, enabled, daily_limit, min_delay_sec, max_delay_sec, target_source, target_cursor, comment_pool, created_at)
-         VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, 0, ?8, ?9)",
-        params![id, new.profile_id, new.action_type, new.daily_limit, new.min_delay_sec, new.max_delay_sec, target_source, comment_pool, now],
+        "INSERT INTO action_rules (id, profile_id, action_type, enabled, daily_limit, min_delay_sec, max_delay_sec, target_source, target_cursor, comment_pool, source_type, source_seed, consecutive_errors, backoff_until, created_at)
+         VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10, 0, NULL, ?11)",
+        params![
+            id,
+            new.profile_id,
+            new.action_type,
+            new.daily_limit,
+            new.min_delay_sec,
+            new.max_delay_sec,
+            target_source,
+            comment_pool,
+            new.source_type,
+            new.source_seed,
+            now,
+        ],
     )?;
     conn.query_row("SELECT * FROM action_rules WHERE id = ?1", params![id], row_to_rule)
 }
@@ -86,6 +116,42 @@ pub fn advance_cursor(conn: &Connection, id: &str, len: i64) -> rusqlite::Result
     conn.execute(
         "UPDATE action_rules SET target_cursor = (target_cursor + 1) % ?1 WHERE id = ?2",
         params![len, id],
+    )?;
+    Ok(())
+}
+
+pub fn record_rule_success(conn: &Connection, id: &str) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE action_rules SET consecutive_errors = 0, backoff_until = NULL WHERE id = ?1",
+        params![id],
+    )?;
+    Ok(())
+}
+
+pub fn record_rule_error(conn: &Connection, id: &str, backoff_until: &str) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE action_rules SET consecutive_errors = consecutive_errors + 1, backoff_until = ?1 WHERE id = ?2",
+        params![backoff_until, id],
+    )?;
+    Ok(())
+}
+
+pub fn append_targets(conn: &Connection, id: &str, new_targets: &[String]) -> rusqlite::Result<()> {
+    let existing: String = conn.query_row(
+        "SELECT target_source FROM action_rules WHERE id = ?1",
+        params![id],
+        |row| row.get(0),
+    )?;
+    let mut targets: Vec<String> = serde_json::from_str(&existing).unwrap_or_default();
+    for t in new_targets {
+        if !targets.contains(t) {
+            targets.push(t.clone());
+        }
+    }
+    let encoded = serde_json::to_string(&targets).unwrap();
+    conn.execute(
+        "UPDATE action_rules SET target_source = ?1 WHERE id = ?2",
+        params![encoded, id],
     )?;
     Ok(())
 }

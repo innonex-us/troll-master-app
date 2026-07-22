@@ -15,6 +15,7 @@ pub struct Profile {
     pub viewport_height: i64,
     pub storage_state_enc_path: Option<String>,
     pub status: String,
+    pub activated_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -41,6 +42,7 @@ fn row_to_profile(row: &rusqlite::Row) -> rusqlite::Result<Profile> {
         viewport_height: row.get("viewport_height")?,
         storage_state_enc_path: row.get("storage_state_enc_path")?,
         status: row.get("status")?,
+        activated_at: row.get("activated_at")?,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
     })
@@ -103,6 +105,17 @@ pub fn set_profile_status(conn: &Connection, id: &str, status: &str) -> rusqlite
     conn.execute(
         "UPDATE profiles SET status = ?1, updated_at = ?2 WHERE id = ?3",
         params![status, now, id],
+    )?;
+    Ok(())
+}
+
+/// Records the first time a profile goes active, used as the warmup-curve reference point.
+/// A no-op if already set, so repeated re-logins don't reset the account's warmup age.
+pub fn set_profile_activated_now(conn: &Connection, id: &str) -> rusqlite::Result<()> {
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE profiles SET activated_at = COALESCE(activated_at, ?1) WHERE id = ?2",
+        params![now, id],
     )?;
     Ok(())
 }

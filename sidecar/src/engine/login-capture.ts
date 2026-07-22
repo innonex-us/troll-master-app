@@ -1,4 +1,5 @@
 import { closeContext, openContext } from "./browser.js";
+import { detectIssue } from "./detection.js";
 import { instagramConfig } from "../platforms/instagram/config.js";
 import { twitterConfig } from "../platforms/twitter/config.js";
 import type { LoginCaptureParams, ActionResult } from "./types.js";
@@ -34,6 +35,12 @@ export async function runLoginCapture(params: LoginCaptureParams): Promise<Actio
         await opened.context.storageState({ path: params.storageStatePlainPath });
         return { status: "success", message: "login captured" };
       }
+
+      const issue = await detectIssue(page, params.platform);
+      if (issue?.issue === "banned") {
+        return { status: "banned", message: issue.detail };
+      }
+
       await sleep(POLL_INTERVAL_MS);
     }
 
