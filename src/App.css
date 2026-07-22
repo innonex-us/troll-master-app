@@ -581,6 +581,33 @@ button.ghost {
   color: var(--text-faint);
 }
 
+.changelog-body {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.markdown-lite p {
+  margin: 0 0 10px 0;
+}
+
+.markdown-lite ul {
+  margin: 0 0 10px 0;
+  padding-left: 20px;
+}
+
+.markdown-lite li {
+  margin-bottom: 4px;
+}
+
+.markdown-lite strong {
+  color: var(--text);
+}
+
+.markdown-lite > *:last-child {
+  margin-bottom: 0;
+}
+
 /* ---------- Modal ---------- */
 .modal-backdrop {
   position: fixed;

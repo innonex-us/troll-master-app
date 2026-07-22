@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import "./App.css";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ProfilesPage } from "./pages/ProfilesPage";
@@ -8,10 +9,20 @@ import { MonitorPage } from "./pages/MonitorPage";
 import { LogsPage } from "./pages/LogsPage";
 import { BlacklistPage } from "./pages/BlacklistPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { ChangelogPage } from "./pages/ChangelogPage";
 import { LockScreen } from "./pages/LockScreen";
 import { UpdateChecker } from "./components/UpdateChecker";
 
-type Tab = "overview" | "profiles" | "campaigns" | "proxies" | "monitor" | "blacklist" | "logs" | "settings";
+type Tab =
+  | "overview"
+  | "profiles"
+  | "campaigns"
+  | "proxies"
+  | "monitor"
+  | "blacklist"
+  | "logs"
+  | "settings"
+  | "changelog";
 
 const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: "overview", label: "Overview", icon: "◆" },
@@ -22,11 +33,17 @@ const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: "blacklist", label: "Blacklist", icon: "⊘" },
   { id: "logs", label: "Logs", icon: "≡" },
   { id: "settings", label: "Settings", icon: "⚙" },
+  { id: "changelog", label: "Changelog", icon: "🕐" },
 ];
 
 function App() {
   const [tab, setTab] = useState<Tab>("overview");
   const [unlocked, setUnlocked] = useState(false);
+  const [version, setVersion] = useState("");
+
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => {});
+  }, []);
 
   if (!unlocked) {
     return <LockScreen onUnlock={() => setUnlocked(true)} />;
@@ -52,7 +69,7 @@ function App() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-footer">v0.1.0 · local engine</div>
+        <div className="sidebar-footer">{version ? `v${version}` : ""} · local engine</div>
       </aside>
 
       <main className="content">
@@ -64,6 +81,7 @@ function App() {
         {tab === "blacklist" && <BlacklistPage />}
         {tab === "logs" && <LogsPage />}
         {tab === "settings" && <SettingsPage />}
+        {tab === "changelog" && <ChangelogPage />}
       </main>
     </div>
   );

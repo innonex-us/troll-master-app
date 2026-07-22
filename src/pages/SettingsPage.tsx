@@ -1,13 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { api, AppSettings } from "../api";
 import { checkForUpdate, installUpdate, type Update } from "../update";
-
-const APP_VERSION = "0.1.0";
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [error, setError] = useState("");
   const [saveStatus, setSaveStatus] = useState("");
+  const [appVersion, setAppVersion] = useState("");
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -38,6 +38,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     refresh();
+    getVersion().then(setAppVersion).catch(() => {});
   }, []);
 
   async function saveSettings(e: FormEvent) {
@@ -268,7 +269,7 @@ export function SettingsPage() {
           </button>
           {pingStatus && <span className="hint">{pingStatus}</span>}
         </div>
-        <p className="hint">jarveeAuto v{APP_VERSION} · local automation engine</p>
+        <p className="hint">jarveeAuto v{appVersion} · local automation engine</p>
       </div>
 
       <div className="panel">
