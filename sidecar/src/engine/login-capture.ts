@@ -2,13 +2,16 @@ import { closeContext, openContext } from "./browser.js";
 import { detectIssue } from "./detection.js";
 import { instagramConfig } from "../platforms/instagram/config.js";
 import { twitterConfig } from "../platforms/twitter/config.js";
+import { facebookConfig } from "../platforms/facebook/config.js";
 import type { LoginCaptureParams, ActionResult } from "./types.js";
 
 const POLL_INTERVAL_MS = 2000;
 const TIMEOUT_MS = 5 * 60 * 1000;
 
 function platformConfig(platform: LoginCaptureParams["platform"]) {
-  return platform === "instagram" ? instagramConfig : twitterConfig;
+  if (platform === "instagram") return instagramConfig;
+  if (platform === "twitter") return twitterConfig;
+  return facebookConfig;
 }
 
 function sleep(ms: number) {

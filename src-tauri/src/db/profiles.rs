@@ -16,6 +16,7 @@ pub struct Profile {
     pub storage_state_enc_path: Option<String>,
     pub status: String,
     pub activated_at: Option<String>,
+    pub group_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -43,6 +44,7 @@ fn row_to_profile(row: &rusqlite::Row) -> rusqlite::Result<Profile> {
         storage_state_enc_path: row.get("storage_state_enc_path")?,
         status: row.get("status")?,
         activated_at: row.get("activated_at")?,
+        group_id: row.get("group_id")?,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
     })
@@ -96,6 +98,15 @@ pub fn set_profile_proxy(conn: &Connection, id: &str, proxy_id: Option<&str>) ->
     conn.execute(
         "UPDATE profiles SET proxy_id = ?1, updated_at = ?2 WHERE id = ?3",
         params![proxy_id, now, id],
+    )?;
+    Ok(())
+}
+
+pub fn set_profile_group(conn: &Connection, id: &str, group_id: Option<&str>) -> rusqlite::Result<()> {
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE profiles SET group_id = ?1, updated_at = ?2 WHERE id = ?3",
+        params![group_id, now, id],
     )?;
     Ok(())
 }

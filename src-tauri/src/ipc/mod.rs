@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 
@@ -36,22 +37,38 @@ impl SidecarClient {
     }
 }
 
-// Dev-only resolution: sidecar/dist/index.js next to src-tauri.
-// Production packaging will switch this to a bundled Tauri externalBin.
-fn sidecar_entry_path() -> std::path::PathBuf {
+/// In dev, `node` is resolved from PATH and the script runs straight out of the
+/// sidecar package's build output next to src-tauri.
+pub fn dev_sidecar_paths() -> (PathBuf, PathBuf) {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    std::path::Path::new(manifest_dir).join("../sidecar/dist/index.js")
+    let script = Path::new(manifest_dir).join("../sidecar/dist/index.js");
+    (PathBuf::from("node"), script)
 }
 
-async fn spawn_client() -> Arc<SidecarClient> {
-    let entry = sidecar_entry_path();
-    let mut child = Command::new("node")
-        .arg(&entry)
+/// In a packaged build, a vendored Node binary ships as a Tauri externalBin
+/// (see `bundle.externalBin` in tauri.conf.json), and the sidecar's JS + node_modules
+/// ship as bundle resources. Both are copied to predictable locations relative to
+/// the running app: the binary next to the main executable, resources under the
+/// app's resource directory.
+pub fn prod_sidecar_paths(resource_dir: &Path) -> (PathBuf, PathBuf) {
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .expect("resolve current exe dir");
+    let bin_name = if cfg!(windows) { "jarveeauto-node.exe" } else { "jarveeauto-node" };
+    let node = exe_dir.join(bin_name);
+    let script = resource_dir.join("sidecar/dist/index.js");
+    (node, script)
+}
+
+async fn spawn_client(exe: PathBuf, script: PathBuf) -> Arc<SidecarClient> {
+    let mut child = Command::new(&exe)
+        .arg(&script)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .unwrap_or_else(|e| panic!("failed to spawn sidecar at {entry:?}: {e}"));
+        .unwrap_or_else(|e| panic!("failed to spawn sidecar ({exe:?} {script:?}): {e}"));
 
     let stdin = child.stdin.take().expect("sidecar stdin not piped");
     let stdout = child.stdout.take().expect("sidecar stdout not piped");
@@ -98,8 +115,13 @@ async fn spawn_client() -> Arc<SidecarClient> {
     })
 }
 
-pub async fn client() -> Arc<SidecarClient> {
-    CLIENT.get_or_init(spawn_client).await.clone()
+/// Lazily spawns the sidecar on first use. `exe`/`script` are only consulted the
+/// very first time this resolves (whichever caller gets there first); every
+/// subsequent call reuses the same running process regardless of the paths passed.
+pub async fn client(exe: &Path, script: &Path) -> Arc<SidecarClient> {
+    let exe = exe.to_path_buf();
+    let script = script.to_path_buf();
+    CLIENT.get_or_init(|| spawn_client(exe, script)).await.clone()
 }
 
 #[cfg(test)]
@@ -108,7 +130,8 @@ mod tests {
 
     #[tokio::test]
     async fn ping_roundtrip() {
-        let client = client().await;
+        let (exe, script) = dev_sidecar_paths();
+        let client = client(&exe, &script).await;
         let result = client.call("ping", serde_json::json!({})).await.unwrap();
         assert_eq!(result.get("pong").and_then(|v| v.as_bool()), Some(true));
     }

@@ -47,9 +47,25 @@ async function detectTwitter(page: Page): Promise<DetectionResult> {
   return null;
 }
 
+async function detectFacebook(page: Page): Promise<DetectionResult> {
+  const url = page.url();
+  if (url.includes("/checkpoint/") && (await textVisible(page, /disabled|suspended/i))) {
+    return { issue: "banned", detail: "Facebook reports this account disabled/suspended" };
+  }
+  if (url.includes("/checkpoint/")) {
+    return { issue: "challenged", detail: "Facebook checkpoint/challenge page shown" };
+  }
+  if (await textVisible(page, /confirm your identity|we suspended|verify it'?s you/i)) {
+    return { issue: "challenged", detail: "Facebook challenge prompt detected on page" };
+  }
+  return null;
+}
+
 export async function detectIssue(
   page: Page,
-  platform: "instagram" | "twitter",
+  platform: "instagram" | "twitter" | "facebook",
 ): Promise<DetectionResult> {
-  return platform === "instagram" ? detectInstagram(page) : detectTwitter(page);
+  if (platform === "instagram") return detectInstagram(page);
+  if (platform === "twitter") return detectTwitter(page);
+  return detectFacebook(page);
 }

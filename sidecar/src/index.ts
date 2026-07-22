@@ -1,7 +1,9 @@
 import { registerHandler, startRpcServer } from "./rpc.js";
 import { runLoginCapture } from "./engine/login-capture.js";
 import { runAction } from "./engine/action-runner.js";
-import type { ActionRunParams, LoginCaptureParams } from "./engine/types.js";
+import { runScrape } from "./engine/scrape-runner.js";
+import { runMonitorScrape } from "./engine/monitor-runner.js";
+import type { ActionRunParams, LoginCaptureParams, MonitorParams, ScrapeParams } from "./engine/types.js";
 
 registerHandler("ping", () => {
   return { pong: true, ts: Date.now() };
@@ -13,6 +15,14 @@ registerHandler("profile.loginCapture", (params) => {
 
 registerHandler("action.run", (params) => {
   return runAction(params as ActionRunParams);
+});
+
+registerHandler("targets.scrape", (params) => {
+  return runScrape(params as ScrapeParams);
+});
+
+registerHandler("monitor.scrapeMetrics", (params) => {
+  return runMonitorScrape(params as MonitorParams);
 });
 
 startRpcServer();

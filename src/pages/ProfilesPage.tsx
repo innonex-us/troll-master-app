@@ -1,11 +1,12 @@
 import { Fragment, useEffect, useState, type FormEvent } from "react";
-import { api, Platform, Profile, Proxy } from "../api";
+import { api, Platform, Profile, ProfileGroup, Proxy } from "../api";
 import { RulesPanel } from "./RulesPanel";
 import { Badge } from "../components/Badge";
 
 export function ProfilesPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [proxies, setProxies] = useState<Proxy[]>([]);
+  const [groups, setGroups] = useState<ProfileGroup[]>([]);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [captureStatus, setCaptureStatus] = useState<Record<string, string>>({});
@@ -14,12 +15,21 @@ export function ProfilesPage() {
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [proxyId, setProxyId] = useState<string>("");
+  const [groupId, setGroupId] = useState<string>("");
+
+  const [newGroupName, setNewGroupName] = useState("");
+  const [groupFilter, setGroupFilter] = useState("");
 
   async function refresh() {
     try {
-      const [p, px] = await Promise.all([api.listProfiles(), api.listProxies()]);
+      const [p, px, g] = await Promise.all([
+        api.listProfiles(),
+        api.listProxies(),
+        api.listProfileGroups(),
+      ]);
       setProfiles(p);
       setProxies(px);
+      setGroups(g);
       setError("");
     } catch (err) {
       setError(String(err));
@@ -33,23 +43,49 @@ export function ProfilesPage() {
   async function addProfile(e: FormEvent) {
     e.preventDefault();
     try {
-      await api.createProfile({
+      const created = await api.createProfile({
         platform,
         display_name: displayName,
         username,
         proxy_id: proxyId || null,
       });
+      if (groupId) {
+        await api.setProfileGroup(created.id, groupId);
+      }
       setDisplayName("");
       setUsername("");
       setProxyId("");
+      setGroupId("");
       await refresh();
     } catch (err) {
       setError(String(err));
     }
   }
 
+  async function addGroup(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await api.createProfileGroup({ name: newGroupName, description: "" });
+      setNewGroupName("");
+      await refresh();
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
+  async function removeGroup(id: string) {
+    await api.deleteProfileGroup(id);
+    if (groupFilter === id) setGroupFilter("");
+    await refresh();
+  }
+
   async function assignProxy(profileId: string, newProxyId: string) {
     await api.setProfileProxy(profileId, newProxyId || null);
+    await refresh();
+  }
+
+  async function assignGroup(profileId: string, newGroupId: string) {
+    await api.setProfileGroup(profileId, newGroupId || null);
     await refresh();
   }
 
@@ -69,6 +105,8 @@ export function ProfilesPage() {
     await refresh();
   }
 
+  const visibleProfiles = groupFilter ? profiles.filter((p) => p.group_id === groupFilter) : profiles;
+
   return (
     <div>
       <div className="page-header">
@@ -79,10 +117,46 @@ export function ProfilesPage() {
       </div>
       {error && <p className="error">{error}</p>}
 
+      <div className="panel">
+        <h3>Groups</h3>
+        <form className="row" onSubmit={addGroup}>
+          <input
+            placeholder="New group name"
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            required
+          />
+          <button type="submit" className="primary">
+            Create Group
+          </button>
+          <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)}>
+            <option value="">Show all profiles</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </form>
+        {groups.length > 0 && (
+          <div className="row">
+            {groups.map((g) => (
+              <span key={g.id} className="badge info">
+                {g.name}
+                <button type="button" className="ghost" onClick={() => removeGroup(g.id)}>
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       <form className="row panel" onSubmit={addProfile}>
         <select value={platform} onChange={(e) => setPlatform(e.target.value as Platform)}>
           <option value="instagram">Instagram</option>
           <option value="twitter">Twitter/X</option>
+          <option value="facebook">Facebook</option>
         </select>
         <input
           placeholder="Display name"
@@ -104,6 +178,14 @@ export function ProfilesPage() {
             </option>
           ))}
         </select>
+        <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+          <option value="">No group</option>
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
         <button type="submit" className="primary">
           Add Profile
         </button>
@@ -117,13 +199,14 @@ export function ProfilesPage() {
             <th>Username</th>
             <th>Platform</th>
             <th>Status</th>
+            <th>Group</th>
             <th>Proxy</th>
             <th>Login</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          {profiles.map((p) => (
+          {visibleProfiles.map((p) => (
             <Fragment key={p.id}>
               <tr>
                 <td>{p.display_name}</td>
@@ -131,6 +214,16 @@ export function ProfilesPage() {
                 <td>{p.platform}</td>
                 <td>
                   <Badge status={p.status} />
+                </td>
+                <td>
+                  <select value={p.group_id ?? ""} onChange={(e) => assignGroup(p.id, e.target.value)}>
+                    <option value="">No group</option>
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
                 </td>
                 <td>
                   <select
@@ -162,16 +255,16 @@ export function ProfilesPage() {
               </tr>
               {expanded === p.id && (
                 <tr>
-                  <td colSpan={7}>
-                    <RulesPanel profileId={p.id} />
+                  <td colSpan={8}>
+                    <RulesPanel profileId={p.id} platform={p.platform} />
                   </td>
                 </tr>
               )}
             </Fragment>
           ))}
-          {profiles.length === 0 && (
+          {visibleProfiles.length === 0 && (
             <tr>
-              <td className="empty" colSpan={7}>
+              <td className="empty" colSpan={8}>
                 No profiles yet — add one above to get started.
               </td>
             </tr>

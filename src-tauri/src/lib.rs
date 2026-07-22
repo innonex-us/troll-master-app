@@ -1,3 +1,4 @@
+mod auth;
 mod commands;
 mod crypto;
 mod db;
@@ -9,7 +10,9 @@ mod state;
 mod storage;
 
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Manager, State};
+
+use crate::state::AppState;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -18,8 +21,8 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-async fn ping_sidecar() -> Result<serde_json::Value, String> {
-    let client = ipc::client().await;
+async fn ping_sidecar(state: State<'_, Arc<AppState>>) -> Result<serde_json::Value, String> {
+    let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
     client.call("ping", serde_json::json!({})).await
 }
 
@@ -34,9 +37,19 @@ pub fn run() {
             let db_path = app_data_dir.join("jarveeauto.sqlite3");
             let db = db::Db::open(&db_path).expect("open sqlite db");
 
+            #[cfg(debug_assertions)]
+            let (sidecar_exe, sidecar_script) = ipc::dev_sidecar_paths();
+            #[cfg(not(debug_assertions))]
+            let (sidecar_exe, sidecar_script) = {
+                let resource_dir = app.path().resource_dir().expect("resolve resource dir");
+                ipc::prod_sidecar_paths(&resource_dir)
+            };
+
             let state = Arc::new(state::AppState {
                 db,
                 app_data_dir: app_data_dir.clone(),
+                sidecar_exe,
+                sidecar_script,
             });
             app.manage(state.clone());
 
@@ -59,7 +72,36 @@ pub fn run() {
             commands::create_rule_cmd,
             commands::set_rule_enabled_cmd,
             commands::delete_rule_cmd,
+            commands::refill_rule_targets_cmd,
+            commands::list_blacklist_cmd,
+            commands::add_blacklist_entry_cmd,
+            commands::remove_blacklist_entry_cmd,
             commands::list_logs_cmd,
+            commands::list_profile_groups_cmd,
+            commands::create_profile_group_cmd,
+            commands::delete_profile_group_cmd,
+            commands::set_profile_group_cmd,
+            commands::list_campaigns_cmd,
+            commands::create_campaign_cmd,
+            commands::delete_campaign_cmd,
+            commands::list_campaign_rules_cmd,
+            commands::create_campaign_rule_cmd,
+            commands::delete_campaign_rule_cmd,
+            commands::set_campaign_enabled_cmd,
+            commands::reset_campaign_cmd,
+            commands::retry_failed_campaign_cmd,
+            commands::list_enrolled_profiles_cmd,
+            commands::enroll_profiles_cmd,
+            commands::unenroll_profile_cmd,
+            commands::list_campaign_rule_states_cmd,
+            commands::list_monitored_posts_cmd,
+            commands::create_monitored_post_cmd,
+            commands::delete_monitored_post_cmd,
+            commands::list_post_snapshots_cmd,
+            commands::scrape_post_now_cmd,
+            commands::has_master_password_cmd,
+            commands::set_master_password_cmd,
+            commands::verify_master_password_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

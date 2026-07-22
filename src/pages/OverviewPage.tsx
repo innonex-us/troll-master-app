@@ -2,6 +2,15 @@ import { useEffect, useState } from "react";
 import { api, Profile, ActionLogEntry } from "../api";
 import { StatTile } from "../components/StatTile";
 import { Badge } from "../components/Badge";
+import { BarChart, Donut, TrendLineChart } from "../components/charts";
+
+const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", twitter: "Twitter/X", facebook: "Facebook" };
+const PLATFORM_COLOR: Record<string, string> = {
+  instagram: "var(--series-ig)",
+  twitter: "var(--series-tw)",
+  facebook: "var(--series-fb)",
+};
+const TREND_DAYS = 14;
 
 export function OverviewPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -10,7 +19,7 @@ export function OverviewPage() {
 
   async function refresh() {
     try {
-      const [p, l] = await Promise.all([api.listProfiles(), api.listLogs(500)]);
+      const [p, l] = await Promise.all([api.listProfiles(), api.listLogs(2000)]);
       setProfiles(p);
       setLogs(l);
       setError("");
@@ -33,6 +42,52 @@ export function OverviewPage() {
   const needsLogin = profiles.filter((p) => p.status === "needs_login").length;
   const attention = profiles.filter((p) => p.status === "challenged" || p.status === "banned").length;
 
+  const profileById = new Map(profiles.map((p) => [p.id, p]));
+  const successLogs = logs.filter((l) => l.status === "success");
+
+  const actionTypeCounts = new Map<string, number>();
+  for (const l of successLogs) {
+    actionTypeCounts.set(l.action_type, (actionTypeCounts.get(l.action_type) ?? 0) + 1);
+  }
+  const actionTypeData = Array.from(actionTypeCounts.entries())
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+
+  const platformCounts = new Map<string, number>();
+  for (const l of successLogs) {
+    const platform = profileById.get(l.profile_id)?.platform;
+    if (platform) platformCounts.set(platform, (platformCounts.get(platform) ?? 0) + 1);
+  }
+  const ranking = Array.from(platformCounts.entries())
+    .map(([platform, count]) => ({ platform, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const accountsByPlatform = new Map<string, number>();
+  for (const p of profiles) {
+    accountsByPlatform.set(p.platform, (accountsByPlatform.get(p.platform) ?? 0) + 1);
+  }
+  const donutData = Array.from(accountsByPlatform.entries()).map(([platform, value]) => ({
+    label: PLATFORM_LABEL[platform] ?? platform,
+    value,
+    color: PLATFORM_COLOR[platform] ?? "var(--text-dim)",
+  }));
+
+  const days: string[] = [];
+  for (let i = TREND_DAYS - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0, 10));
+  }
+  const platforms = Array.from(new Set(profiles.map((p) => p.platform)));
+  const trendSeries = platforms.map((platform) => ({
+    platform,
+    values: days.map(
+      (day) =>
+        successLogs.filter((l) => l.executed_at.slice(0, 10) === day && profileById.get(l.profile_id)?.platform === platform)
+          .length,
+    ),
+  }));
+
   return (
     <div>
       <div className="page-header">
@@ -50,6 +105,51 @@ export function OverviewPage() {
         <StatTile label="Needs Attention" value={attention} accent="err" />
         <StatTile label="Actions Today" value={successToday} accent="ok" />
         <StatTile label="Errors Today" value={errorsToday} accent={errorsToday > 0 ? "err" : undefined} />
+      </div>
+
+      <div className="chart-grid">
+        <div className="panel">
+          <h3>Actions by Type</h3>
+          <BarChart data={actionTypeData} />
+        </div>
+        <div className="panel">
+          <h3>Accounts by Platform</h3>
+          <Donut data={donutData} />
+        </div>
+      </div>
+
+      <div className="panel">
+        <h3>Engagement Trend (last {TREND_DAYS} days)</h3>
+        <TrendLineChart days={days} series={trendSeries} />
+      </div>
+
+      <div className="panel">
+        <h3>Platform Ranking</h3>
+        <table className="mini-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Platform</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ranking.map((r, i) => (
+              <tr key={r.platform}>
+                <td>{i + 1}</td>
+                <td>{PLATFORM_LABEL[r.platform] ?? r.platform}</td>
+                <td>{r.count}</td>
+              </tr>
+            ))}
+            {ranking.length === 0 && (
+              <tr>
+                <td className="empty" colSpan={3}>
+                  No completed actions yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       <div className="panel">

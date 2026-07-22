@@ -2,6 +2,7 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 use crate::db::{Db, Profile, Proxy};
+use crate::state::AppState;
 use crate::{crypto, ipc, storage};
 
 fn proxy_json(proxy: &Option<Proxy>) -> Value {
@@ -38,25 +39,21 @@ fn load_proxy(db: &Db, profile: &Profile) -> Option<Proxy> {
 }
 
 /// Runs headed login capture for a profile, then encrypts the resulting session at rest.
-pub async fn capture_login(
-    db: &Db,
-    app_data_dir: &Path,
-    profile_id: &str,
-) -> Result<(), String> {
+pub async fn capture_login(state: &AppState, profile_id: &str) -> Result<(), String> {
     let profile = {
-        let conn = db.0.lock().unwrap();
+        let conn = state.db.0.lock().unwrap();
         crate::db::get_profile(&conn, profile_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "profile not found".to_string())?
     };
-    let proxy = load_proxy(db, &profile);
+    let proxy = load_proxy(&state.db, &profile);
 
-    let tmp_path = storage::tmp_plain_path(app_data_dir, profile_id);
+    let tmp_path = storage::tmp_plain_path(&state.app_data_dir, profile_id);
     if let Some(parent) = tmp_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    let client = ipc::client().await;
+    let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
     let result = client
         .call(
             "profile.loginCapture",
@@ -78,22 +75,128 @@ pub async fn capture_login(
             .unwrap_or("login capture failed")
             .to_string();
         if status == "banned" {
-            let conn = db.0.lock().unwrap();
+            let conn = state.db.0.lock().unwrap();
             let _ = crate::db::set_profile_status(&conn, profile_id, "banned");
         }
         return Err(message);
     }
 
-    let enc_path = storage::enc_path(app_data_dir, profile_id);
+    let enc_path = storage::enc_path(&state.app_data_dir, profile_id);
     crypto::encrypt_file(&tmp_path, &enc_path).map_err(|e| e.to_string())?;
 
-    let conn = db.0.lock().unwrap();
+    let conn = state.db.0.lock().unwrap();
     crate::db::set_profile_storage_state_path(&conn, profile_id, Some(&enc_path.to_string_lossy()))
         .map_err(|e| e.to_string())?;
     crate::db::set_profile_status(&conn, profile_id, "active").map_err(|e| e.to_string())?;
     crate::db::set_profile_activated_now(&conn, profile_id).map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+/// Uses a profile's already-logged-in session to scrape fresh targets (post/tweet URLs for
+/// hashtag sources, usernames for followers-of sources) to top up a rule's target queue.
+pub async fn scrape_targets(
+    state: &AppState,
+    profile: &Profile,
+    source_type: &str,
+    seed: &str,
+    limit: i64,
+    skip_no_avatar: bool,
+) -> Result<Vec<String>, String> {
+    let enc_path = match &profile.storage_state_enc_path {
+        Some(p) => Path::new(p).to_path_buf(),
+        None => return Err("profile has no captured login session".to_string()),
+    };
+
+    let tmp_path = storage::tmp_plain_path(&state.app_data_dir, &profile.id);
+    crypto::decrypt_to_file(&enc_path, &tmp_path).map_err(|e| e.to_string())?;
+
+    let proxy = load_proxy(&state.db, profile);
+    let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
+    let call_result = client
+        .call(
+            "targets.scrape",
+            json!({
+                "profileId": profile.id,
+                "platform": profile.platform,
+                "sourceType": source_type,
+                "seed": seed,
+                "limit": limit,
+                "skipNoAvatar": skip_no_avatar,
+                "proxy": proxy_json(&proxy),
+                "fingerprint": fingerprint_json(profile),
+                "storageStatePlainPath": tmp_path.to_string_lossy(),
+            }),
+        )
+        .await;
+
+    if tmp_path.exists() {
+        let _ = crypto::encrypt_file(&tmp_path, &enc_path);
+    }
+
+    let value = call_result?;
+    let status = value.get("status").and_then(|v| v.as_str()).unwrap_or("error");
+    if status != "success" {
+        let message = value
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("scrape failed")
+            .to_string();
+        return Err(message);
+    }
+
+    let targets = value
+        .get("targets")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        .unwrap_or_default();
+    Ok(targets)
+}
+
+/// Scrapes engagement metrics for a monitored post/tweet using a viewer profile's
+/// logged-in session. Metric extraction is best-effort — see the sidecar's
+/// platform monitor modules for the heuristics and their known fragility.
+pub async fn scrape_post_metrics(
+    state: &AppState,
+    viewer_profile: &Profile,
+    url: &str,
+) -> Result<crate::db::PostMetrics, String> {
+    let enc_path = match &viewer_profile.storage_state_enc_path {
+        Some(p) => Path::new(p).to_path_buf(),
+        None => return Err("viewer profile has no captured login session".to_string()),
+    };
+
+    let tmp_path = storage::tmp_plain_path(&state.app_data_dir, &viewer_profile.id);
+    crypto::decrypt_to_file(&enc_path, &tmp_path).map_err(|e| e.to_string())?;
+
+    let proxy = load_proxy(&state.db, viewer_profile);
+    let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
+    let call_result = client
+        .call(
+            "monitor.scrapeMetrics",
+            json!({
+                "platform": viewer_profile.platform,
+                "url": url,
+                "proxy": proxy_json(&proxy),
+                "fingerprint": fingerprint_json(viewer_profile),
+                "storageStatePlainPath": tmp_path.to_string_lossy(),
+            }),
+        )
+        .await;
+
+    if tmp_path.exists() {
+        let _ = crypto::encrypt_file(&tmp_path, &enc_path);
+    }
+
+    let value = call_result?;
+    let status = value.get("status").and_then(|v| v.as_str()).unwrap_or("error");
+    if status != "success" {
+        let message = value.get("message").and_then(|v| v.as_str()).unwrap_or("scrape failed").to_string();
+        return Err(message);
+    }
+
+    let metrics = value.get("metrics").cloned().unwrap_or(Value::Null);
+    serde_json::from_value(metrics).map_err(|e| e.to_string())
 }
 
 pub struct ActionOutcome {
@@ -103,12 +206,12 @@ pub struct ActionOutcome {
 
 /// Runs a single automated action (follow/unfollow/like/comment) for a profile against a target.
 pub async fn run_action(
-    db: &Db,
-    app_data_dir: &Path,
+    state: &AppState,
     profile: &Profile,
     action_type: &str,
     target: &str,
     comment_pool: &[String],
+    dm_message: &str,
 ) -> ActionOutcome {
     let enc_path = match &profile.storage_state_enc_path {
         Some(p) => Path::new(p).to_path_buf(),
@@ -120,7 +223,7 @@ pub async fn run_action(
         }
     };
 
-    let tmp_path = storage::tmp_plain_path(app_data_dir, &profile.id);
+    let tmp_path = storage::tmp_plain_path(&state.app_data_dir, &profile.id);
     if let Err(e) = crypto::decrypt_to_file(&enc_path, &tmp_path) {
         return ActionOutcome {
             status: "error".to_string(),
@@ -128,9 +231,9 @@ pub async fn run_action(
         };
     }
 
-    let proxy = load_proxy(db, profile);
+    let proxy = load_proxy(&state.db, profile);
 
-    let client = ipc::client().await;
+    let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
     let call_result = client
         .call(
             "action.run",
@@ -143,6 +246,7 @@ pub async fn run_action(
                 "fingerprint": fingerprint_json(profile),
                 "storageStatePlainPath": tmp_path.to_string_lossy(),
                 "commentPool": comment_pool,
+                "dmMessage": dm_message,
             }),
         )
         .await;
