@@ -1,0 +1,19 @@
+{
+  "name": "jarveeauto-sidecar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0"
+  }
+}
