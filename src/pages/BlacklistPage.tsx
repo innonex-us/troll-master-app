@@ -1,12 +1,20 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, BlacklistEntry } from "../api";
+
+function parseUsernameFile(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim().replace(/^@/, ""))
+    .filter((l) => l && !l.startsWith("#"));
+}
 
 export function BlacklistPage() {
   const [entries, setEntries] = useState<BlacklistEntry[]>([]);
   const [error, setError] = useState("");
   const [backupStatus, setBackupStatus] = useState("");
   const [username, setUsername] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     try {
@@ -65,6 +73,23 @@ export function BlacklistPage() {
     }
   }
 
+  async function importUsernameFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBackupStatus("");
+    try {
+      const usernames = parseUsernameFile(await file.text());
+      for (const u of usernames) {
+        await api.addBlacklistEntry(null, u);
+      }
+      setBackupStatus(`imported ${usernames.length} usernames from file`);
+      await refresh();
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -80,12 +105,23 @@ export function BlacklistPage() {
             Export
           </button>
           <button type="button" onClick={importBlacklist}>
-            Import
+            Import JSON
           </button>
+          <button type="button" onClick={() => fileInputRef.current?.click()}>
+            Import TXT
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.csv"
+            style={{ display: "none" }}
+            onChange={importUsernameFile}
+          />
         </div>
       </div>
       {error && <p className="error">{error}</p>}
       {backupStatus && <p className="hint">{backupStatus}</p>}
+      <p className="sub">TXT: one username per line (with or without @).</p>
 
       <form className="row panel" onSubmit={addEntry}>
         <input

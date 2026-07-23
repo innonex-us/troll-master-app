@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, Campaign, Platform, Pod, Profile, ProfileGroup, Proxy } from "../api";
 import { RulesPanel } from "./RulesPanel";
@@ -7,6 +7,36 @@ import { Badge } from "../components/Badge";
 import { Modal } from "../components/Modal";
 import { BulkToolbar } from "../components/BulkToolbar";
 import { BulkRuleModal } from "../components/BulkRuleModal";
+
+const VALID_PLATFORMS: Platform[] = ["instagram", "twitter", "facebook", "tiktok", "linkedin", "youtube"];
+
+/** CSV with a header row: platform,username,display_name,proxy_label,group_name,device_name
+ * (only platform+username are required; the rest are optional). Column order is
+ * free — matched by header name, not position. Fields must not contain commas. */
+function parseProfilesCsv(text: string) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"));
+  if (lines.length === 0) return [];
+
+  const cols = lines[0].toLowerCase().split(",").map((c) => c.trim());
+  return lines.slice(1).map((line) => {
+    const cells = line.split(",").map((c) => c.trim());
+    const get = (name: string) => {
+      const i = cols.indexOf(name);
+      return i >= 0 ? cells[i] ?? "" : "";
+    };
+    return {
+      platform: get("platform").toLowerCase(),
+      username: get("username"),
+      display_name: get("display_name") || get("username"),
+      proxy_label: get("proxy_label"),
+      group_name: get("group_name"),
+      device_name: get("device_name"),
+    };
+  });
+}
 
 export function ProfilesPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -38,6 +68,7 @@ export function ProfilesPage() {
   const [bulkProxyId, setBulkProxyId] = useState("");
   const [bulkCampaignId, setBulkCampaignId] = useState("");
   const [bulkPodId, setBulkPodId] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     try {
@@ -166,6 +197,47 @@ export function ProfilesPage() {
     }
   }
 
+  async function importProfilesCsv(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBackupStatus("");
+    try {
+      const rows = parseProfilesCsv(await file.text());
+      let created = 0;
+      const skipped: string[] = [];
+      for (const row of rows) {
+        if (!row.username || !VALID_PLATFORMS.includes(row.platform as Platform)) {
+          skipped.push(`${row.username || "(blank)"}: invalid or missing platform "${row.platform}"`);
+          continue;
+        }
+        const matchedProxy = row.proxy_label
+          ? proxies.find((p) => p.label.toLowerCase() === row.proxy_label.toLowerCase())
+          : undefined;
+        const matchedGroup = row.group_name
+          ? groups.find((g) => g.name.toLowerCase() === row.group_name.toLowerCase())
+          : undefined;
+        const createdProfile = await api.createProfile({
+          platform: row.platform as Platform,
+          display_name: row.display_name,
+          username: row.username,
+          proxy_id: matchedProxy?.id ?? null,
+          device_name: row.device_name,
+        });
+        if (matchedGroup) {
+          await api.setProfileGroup(createdProfile.id, matchedGroup.id);
+        }
+        created += 1;
+      }
+      setBackupStatus(
+        `created ${created} profile(s) from CSV` + (skipped.length > 0 ? `; skipped: ${skipped.join("; ")}` : ""),
+      );
+      await refresh();
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
+
   async function duplicateProfile(id: string) {
     try {
       await api.duplicateProfile(id);
@@ -241,8 +313,18 @@ export function ProfilesPage() {
             Export
           </button>
           <button type="button" onClick={importProfiles}>
-            Import
+            Import JSON
           </button>
+          <button type="button" onClick={() => fileInputRef.current?.click()}>
+            Import CSV
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.txt"
+            style={{ display: "none" }}
+            onChange={importProfilesCsv}
+          />
           <button type="button" className="primary" onClick={() => setShowAddProfile(true)}>
             + Add Profile
           </button>
@@ -250,6 +332,10 @@ export function ProfilesPage() {
       </div>
       {error && <p className="error">{error}</p>}
       {backupStatus && <p className="hint">{backupStatus}</p>}
+      <p className="sub">
+        CSV: header row platform,username,display_name,proxy_label,group_name,device_name (only
+        platform+username required) — creates profile shells needing individual login after.
+      </p>
 
       <div className="panel">
         <h3>Groups</h3>

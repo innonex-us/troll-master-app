@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { ActionType, DmSequenceStep, NewActionRule, Platform, SourceType } from "../api";
 
 export const ACTIONS_BY_PLATFORM: Record<Platform, ActionType[]> = {
@@ -48,6 +48,7 @@ export function RuleForm({
 }) {
   const availableActions = Array.from(new Set(platforms.flatMap((p) => ACTIONS_BY_PLATFORM[p])));
   const [error, setError] = useState("");
+  const targetsFileRef = useRef<HTMLInputElement>(null);
 
   const [actionType, setActionType] = useState<ActionType>(availableActions[0]);
   const [dailyLimit, setDailyLimit] = useState(20);
@@ -78,6 +79,17 @@ export function RuleForm({
   function onActionTypeChange(next: ActionType) {
     setActionType(next);
     setSourceType("explicit");
+  }
+
+  async function loadTargetsFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const lines = (await file.text())
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("#"));
+    setTargets((prev) => (prev ? `${prev}\n${lines.join("\n")}` : lines.join("\n")));
   }
 
   async function submit(e: FormEvent) {
@@ -162,16 +174,28 @@ export function RuleForm({
       />
 
       {sourceType === "explicit" && (
-        <textarea
-          placeholder={
-            meta.targetKind === "username"
-              ? "usernames, one per line"
-              : "post/tweet URLs, one per line"
-          }
-          value={targets}
-          onChange={(e) => setTargets(e.target.value)}
-          rows={3}
-        />
+        <>
+          <textarea
+            placeholder={
+              meta.targetKind === "username"
+                ? "usernames, one per line"
+                : "post/tweet URLs, one per line"
+            }
+            value={targets}
+            onChange={(e) => setTargets(e.target.value)}
+            rows={3}
+          />
+          <button type="button" className="ghost" onClick={() => targetsFileRef.current?.click()}>
+            Load from file
+          </button>
+          <input
+            ref={targetsFileRef}
+            type="file"
+            accept=".csv,.txt"
+            style={{ display: "none" }}
+            onChange={loadTargetsFile}
+          />
+        </>
       )}
       {(sourceType === "hashtag" || sourceType === "followers_of") && (
         <input
