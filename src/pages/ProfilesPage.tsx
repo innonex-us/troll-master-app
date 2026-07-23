@@ -255,6 +255,9 @@ export function ProfilesPage() {
               <option value="instagram">Instagram</option>
               <option value="twitter">Twitter/X</option>
               <option value="facebook">Facebook</option>
+              <option value="tiktok">TikTok</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="youtube">YouTube</option>
             </select>
             <input
               placeholder="Display name"

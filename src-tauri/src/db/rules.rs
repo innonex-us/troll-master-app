@@ -22,6 +22,8 @@ pub struct ActionRule {
     /// spintax template used by the "dm" action, e.g. "{Hey|Hi} {{target}}, love your posts!"
     pub dm_message: String,
     pub filter_skip_no_avatar: bool,
+    /// "like" | "emoji" | "comment" — only meaningful when action_type is "react_story"
+    pub reaction_type: String,
     pub created_at: String,
 }
 
@@ -43,10 +45,16 @@ pub struct NewActionRule {
     pub dm_message: String,
     #[serde(default)]
     pub filter_skip_no_avatar: bool,
+    #[serde(default = "default_reaction_type")]
+    pub reaction_type: String,
 }
 
 fn default_source_type() -> String {
     "explicit".to_string()
+}
+
+fn default_reaction_type() -> String {
+    "like".to_string()
 }
 
 fn row_to_rule(row: &rusqlite::Row) -> rusqlite::Result<ActionRule> {
@@ -69,6 +77,7 @@ fn row_to_rule(row: &rusqlite::Row) -> rusqlite::Result<ActionRule> {
         backoff_until: row.get("backoff_until")?,
         dm_message: row.get("dm_message")?,
         filter_skip_no_avatar: row.get::<_, i64>("filter_skip_no_avatar")? != 0,
+        reaction_type: row.get("reaction_type")?,
         created_at: row.get("created_at")?,
     })
 }
@@ -79,8 +88,8 @@ pub fn insert_rule(conn: &Connection, new: &NewActionRule) -> rusqlite::Result<A
     let target_source = serde_json::to_string(&new.target_source).unwrap();
     let comment_pool = serde_json::to_string(&new.comment_pool).unwrap();
     conn.execute(
-        "INSERT INTO action_rules (id, profile_id, action_type, enabled, daily_limit, min_delay_sec, max_delay_sec, target_source, target_cursor, comment_pool, source_type, source_seed, consecutive_errors, backoff_until, dm_message, filter_skip_no_avatar, created_at)
-         VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10, 0, NULL, ?11, ?12, ?13)",
+        "INSERT INTO action_rules (id, profile_id, action_type, enabled, daily_limit, min_delay_sec, max_delay_sec, target_source, target_cursor, comment_pool, source_type, source_seed, consecutive_errors, backoff_until, dm_message, filter_skip_no_avatar, reaction_type, created_at)
+         VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10, 0, NULL, ?11, ?12, ?13, ?14)",
         params![
             id,
             new.profile_id,
@@ -94,6 +103,7 @@ pub fn insert_rule(conn: &Connection, new: &NewActionRule) -> rusqlite::Result<A
             new.source_seed,
             new.dm_message,
             new.filter_skip_no_avatar as i64,
+            new.reaction_type,
             now,
         ],
     )?;

@@ -218,7 +218,16 @@ async fn tick_standalone_rules(app_handle: &AppHandle, state: &Arc<AppState>, ti
                 message: "target is blacklisted".to_string(),
             }
         } else {
-            executor::run_action(state, &profile, &rule.action_type, &target, &rule.comment_pool, &rule.dm_message).await
+            executor::run_action(
+                state,
+                &profile,
+                &rule.action_type,
+                &target,
+                &rule.comment_pool,
+                &rule.dm_message,
+                &rule.reaction_type,
+            )
+            .await
         };
 
         {
@@ -331,7 +340,16 @@ async fn tick_campaigns(app_handle: &AppHandle, state: &Arc<AppState>, tick_inte
                 message: "target is blacklisted".to_string(),
             }
         } else {
-            executor::run_action(state, &profile, &rule.action_type, &target, &rule.comment_pool, &rule.dm_message).await
+            executor::run_action(
+                state,
+                &profile,
+                &rule.action_type,
+                &target,
+                &rule.comment_pool,
+                &rule.dm_message,
+                &rule.reaction_type,
+            )
+            .await
         };
 
         {

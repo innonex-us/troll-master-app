@@ -126,6 +126,40 @@ export async function viewStory(page: Page, username: string): Promise<ActionRes
   }
 }
 
+/** Views a story like `viewStory`, then applies a reaction: a quick-tap heart
+ * ("like"/"emoji" — Instagram's story quick-reactions are a fixed emoji row,
+ * so both map to the same first quick-react control), or a text reply typed
+ * into the story's reply box ("comment"). Best-effort like `viewStory` itself. */
+export async function reactStory(
+  page: Page,
+  username: string,
+  reactionType: string,
+  replyText: string,
+): Promise<ActionResult> {
+  const viewed = await viewStory(page, username);
+  if (viewed.status !== "success") return viewed;
+
+  if (reactionType === "comment") {
+    const box = page.getByPlaceholder(/Send message/i).first();
+    if (!(await box.isVisible().catch(() => false))) {
+      return { status: "skipped", message: `no reply box available on ${username}'s story` };
+    }
+    await box.click();
+    await box.fill(replyText);
+    await box.press("Enter");
+    await page.waitForTimeout(1000);
+    return { status: "success", message: `replied to ${username}'s story` };
+  }
+
+  const reactionButton = page.locator('[aria-label="Love"], svg[aria-label="Like"]').first();
+  if (!(await reactionButton.isVisible().catch(() => false))) {
+    return { status: "skipped", message: `no quick-reaction available on ${username}'s story` };
+  }
+  await reactionButton.click();
+  await page.waitForTimeout(800);
+  return { status: "success", message: `reacted to ${username}'s story` };
+}
+
 export async function dm(page: Page, username: string, message: string): Promise<ActionResult> {
   await page.goto(profileUrl(username), { waitUntil: "domcontentloaded" });
   const messageButton = page.getByRole("button", { name: /^Message$/ }).first();

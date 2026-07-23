@@ -3,21 +3,41 @@ import { detectIssue } from "./detection.js";
 import { scrapePostMetrics as scrapeInstagramMetrics } from "../platforms/instagram/monitor.js";
 import { scrapeTweetMetrics } from "../platforms/twitter/monitor.js";
 import { scrapePostMetrics as scrapeFacebookMetrics } from "../platforms/facebook/monitor.js";
+import { scrapePostMetrics as scrapeTiktokMetrics } from "../platforms/tiktok/monitor.js";
+import { scrapePostMetrics as scrapeLinkedinMetrics } from "../platforms/linkedin/monitor.js";
+import { scrapePostMetrics as scrapeYoutubeMetrics } from "../platforms/youtube/monitor.js";
 import { instagramConfig } from "../platforms/instagram/config.js";
 import { twitterConfig } from "../platforms/twitter/config.js";
 import { facebookConfig } from "../platforms/facebook/config.js";
-import type { MonitorParams, MonitorResult, PostMetrics } from "./types.js";
+import { tiktokConfig } from "../platforms/tiktok/config.js";
+import { linkedinConfig } from "../platforms/linkedin/config.js";
+import { youtubeConfig } from "../platforms/youtube/config.js";
+import type { MonitorParams, MonitorResult, Platform, PostMetrics } from "./types.js";
 
-function baseUrlFor(platform: MonitorParams["platform"]): string {
-  if (platform === "instagram") return instagramConfig.baseUrl;
-  if (platform === "twitter") return twitterConfig.baseUrl;
-  return facebookConfig.baseUrl;
+const BASE_URL: Record<Platform, string> = {
+  instagram: instagramConfig.baseUrl,
+  twitter: twitterConfig.baseUrl,
+  facebook: facebookConfig.baseUrl,
+  tiktok: tiktokConfig.baseUrl,
+  linkedin: linkedinConfig.baseUrl,
+  youtube: youtubeConfig.baseUrl,
+};
+
+const SCRAPE_METRICS: Record<Platform, typeof scrapeInstagramMetrics> = {
+  instagram: scrapeInstagramMetrics,
+  twitter: scrapeTweetMetrics,
+  facebook: scrapeFacebookMetrics,
+  tiktok: scrapeTiktokMetrics,
+  linkedin: scrapeLinkedinMetrics,
+  youtube: scrapeYoutubeMetrics,
+};
+
+function baseUrlFor(platform: Platform): string {
+  return BASE_URL[platform];
 }
 
-async function scrapeFor(platform: MonitorParams["platform"], page: Parameters<typeof scrapeInstagramMetrics>[0], url: string): Promise<PostMetrics> {
-  if (platform === "instagram") return scrapeInstagramMetrics(page, url);
-  if (platform === "twitter") return scrapeTweetMetrics(page, url);
-  return scrapeFacebookMetrics(page, url);
+async function scrapeFor(platform: Platform, page: Parameters<typeof scrapeInstagramMetrics>[0], url: string): Promise<PostMetrics> {
+  return SCRAPE_METRICS[platform](page, url);
 }
 
 export async function runMonitorScrape(params: MonitorParams): Promise<MonitorResult> {

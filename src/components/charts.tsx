@@ -6,12 +6,18 @@ const SERIES_COLOR: Record<string, string> = {
   instagram: "var(--series-ig)",
   twitter: "var(--series-tw)",
   facebook: "var(--series-fb)",
+  tiktok: "var(--series-tt)",
+  linkedin: "var(--series-li)",
+  youtube: "var(--series-yt)",
 };
 
 const PLATFORM_LABEL: Record<string, string> = {
   instagram: "Instagram",
   twitter: "Twitter/X",
   facebook: "Facebook",
+  tiktok: "TikTok",
+  linkedin: "LinkedIn",
+  youtube: "YouTube",
 };
 
 export function BarChart({ data }: { data: { label: string; value: number }[] }) {

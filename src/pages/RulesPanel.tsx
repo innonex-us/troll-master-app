@@ -2,9 +2,12 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, ActionRule, ActionType, Platform, SourceType } from "../api";
 
 const ACTIONS_BY_PLATFORM: Record<Platform, ActionType[]> = {
-  instagram: ["follow", "unfollow", "like", "unlike", "comment", "save", "view_story", "dm"],
+  instagram: ["follow", "unfollow", "like", "unlike", "comment", "save", "view_story", "react_story", "dm"],
   twitter: ["follow", "unfollow", "like", "unlike", "comment", "retweet", "unretweet", "dm"],
   facebook: ["follow", "unfollow", "like", "unlike", "comment", "dm"],
+  tiktok: ["follow", "unfollow", "like", "unlike", "comment", "save", "view_story", "react_story", "dm"],
+  linkedin: ["follow", "unfollow", "like", "unlike", "comment", "dm"],
+  youtube: ["follow", "unfollow", "like", "unlike", "comment", "view_story", "react_story", "dm"],
 };
 
 // which non-explicit source(s) make sense for each action, and whether targets are
@@ -17,6 +20,7 @@ const ACTION_META: Record<ActionType, { sources: SourceType[]; targetKind: "user
   comment: { sources: ["hashtag"], targetKind: "url" },
   save: { sources: ["hashtag"], targetKind: "url" },
   view_story: { sources: ["followers_of"], targetKind: "username" },
+  react_story: { sources: ["followers_of"], targetKind: "username" },
   dm: { sources: ["followers_of"], targetKind: "username" },
   retweet: { sources: ["hashtag"], targetKind: "url" },
   unretweet: { sources: [], targetKind: "url" },
@@ -43,6 +47,7 @@ export function RulesPanel({ profileId, platform }: { profileId: string; platfor
   const [targets, setTargets] = useState("");
   const [comments, setComments] = useState("");
   const [dmMessage, setDmMessage] = useState("");
+  const [reactionType, setReactionType] = useState("like");
   const [sourceType, setSourceType] = useState<SourceType>("explicit");
   const [sourceSeed, setSourceSeed] = useState("");
   const [daysThreshold, setDaysThreshold] = useState(3);
@@ -94,6 +99,7 @@ export function RulesPanel({ profileId, platform }: { profileId: string; platfor
         source_seed: sourceType === "non_followbacks" ? String(daysThreshold) : sourceSeed,
         dm_message: dmMessage,
         filter_skip_no_avatar: skipNoAvatar,
+        reaction_type: reactionType,
       });
       setTargets("");
       setComments("");
@@ -289,7 +295,14 @@ export function RulesPanel({ profileId, platform }: { profileId: string; platfor
           />
         )}
 
-        {actionType === "comment" && (
+        {actionType === "react_story" && (
+          <select value={reactionType} onChange={(e) => setReactionType(e.target.value)}>
+            <option value="like">Quick-react (like/heart)</option>
+            <option value="emoji">Quick-react (emoji)</option>
+            <option value="comment">Reply with text</option>
+          </select>
+        )}
+        {(actionType === "comment" || (actionType === "react_story" && reactionType === "comment")) && (
           <textarea
             placeholder="comment pool, one per line — supports {spintax|variants}"
             value={comments}

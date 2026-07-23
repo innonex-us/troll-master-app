@@ -4,11 +4,21 @@ import { StatTile } from "../components/StatTile";
 import { Badge } from "../components/Badge";
 import { BarChart, Donut, TrendLineChart } from "../components/charts";
 
-const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", twitter: "Twitter/X", facebook: "Facebook" };
+const PLATFORM_LABEL: Record<string, string> = {
+  instagram: "Instagram",
+  twitter: "Twitter/X",
+  facebook: "Facebook",
+  tiktok: "TikTok",
+  linkedin: "LinkedIn",
+  youtube: "YouTube",
+};
 const PLATFORM_COLOR: Record<string, string> = {
   instagram: "var(--series-ig)",
   twitter: "var(--series-tw)",
   facebook: "var(--series-fb)",
+  tiktok: "var(--series-tt)",
+  linkedin: "var(--series-li)",
+  youtube: "var(--series-yt)",
 };
 const TREND_DAYS = 14;
 

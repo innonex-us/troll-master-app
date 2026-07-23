@@ -10,6 +10,7 @@ const ALL_ACTIONS: ActionType[] = [
   "dm",
   "save",
   "view_story",
+  "react_story",
   "retweet",
   "unretweet",
 ];
@@ -32,6 +33,7 @@ export function CampaignRulesPanel({ campaignId }: { campaignId: string }) {
   const [targets, setTargets] = useState("");
   const [comments, setComments] = useState("");
   const [dmMessage, setDmMessage] = useState("");
+  const [reactionType, setReactionType] = useState("like");
   const [sourceType, setSourceType] = useState<SourceType>("explicit");
   const [sourceSeed, setSourceSeed] = useState("");
   const [skipNoAvatar, setSkipNoAvatar] = useState(false);
@@ -74,6 +76,7 @@ export function CampaignRulesPanel({ campaignId }: { campaignId: string }) {
         source_seed: sourceSeed,
         dm_message: dmMessage,
         filter_skip_no_avatar: skipNoAvatar,
+        reaction_type: reactionType,
       });
       setTargets("");
       setComments("");
@@ -210,7 +213,14 @@ export function CampaignRulesPanel({ campaignId }: { campaignId: string }) {
           </label>
         )}
 
-        {actionType === "comment" && (
+        {actionType === "react_story" && (
+          <select value={reactionType} onChange={(e) => setReactionType(e.target.value)}>
+            <option value="like">Quick-react (like/heart)</option>
+            <option value="emoji">Quick-react (emoji)</option>
+            <option value="comment">Reply with text</option>
+          </select>
+        )}
+        {(actionType === "comment" || (actionType === "react_story" && reactionType === "comment")) && (
           <textarea
             placeholder="comment pool, one per line — supports {spintax|variants}"
             value={comments}

@@ -296,6 +296,7 @@ pub async fn run_action(
     target: &str,
     comment_pool: &[String],
     dm_message: &str,
+    reaction_type: &str,
 ) -> ActionOutcome {
     let enc_path = match &profile.storage_state_enc_path {
         Some(p) => Path::new(p).to_path_buf(),
@@ -331,6 +332,7 @@ pub async fn run_action(
                 "storageStatePlainPath": tmp_path.to_string_lossy(),
                 "commentPool": comment_pool,
                 "dmMessage": dm_message,
+                "reactionType": reaction_type,
             }),
         )
         .await;

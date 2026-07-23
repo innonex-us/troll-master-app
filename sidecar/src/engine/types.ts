@@ -14,9 +14,11 @@ export type FingerprintConfig = {
   viewportHeight: number;
 };
 
+export type Platform = "instagram" | "twitter" | "facebook" | "tiktok" | "linkedin" | "youtube";
+
 export type LoginCaptureParams = {
   profileId: string;
-  platform: "instagram" | "twitter" | "facebook";
+  platform: Platform;
   proxy?: ProxyConfig | null;
   fingerprint: FingerprintConfig;
   storageStatePlainPath: string;
@@ -35,7 +37,8 @@ export type InstagramActionType =
   | "comment"
   | "dm"
   | "save"
-  | "view_story";
+  | "view_story"
+  | "react_story";
 
 export type TwitterActionType =
   | "follow"
@@ -49,16 +52,46 @@ export type TwitterActionType =
 
 export type FacebookActionType = "follow" | "unfollow" | "like" | "unlike" | "comment" | "dm";
 
+export type TiktokActionType =
+  | "follow"
+  | "unfollow"
+  | "like"
+  | "unlike"
+  | "comment"
+  | "dm"
+  | "save"
+  | "view_story"
+  | "react_story";
+
+export type LinkedinActionType = "follow" | "unfollow" | "like" | "unlike" | "comment" | "dm";
+
+export type YoutubeActionType =
+  | "follow"
+  | "unfollow"
+  | "like"
+  | "unlike"
+  | "comment"
+  | "dm"
+  | "view_story"
+  | "react_story";
+
 export type ActionRunParams = {
   profileId: string;
-  platform: "instagram" | "twitter" | "facebook";
-  actionType: InstagramActionType | TwitterActionType | FacebookActionType;
+  platform: Platform;
+  actionType:
+    | InstagramActionType
+    | TwitterActionType
+    | FacebookActionType
+    | TiktokActionType
+    | LinkedinActionType
+    | YoutubeActionType;
   target: string;
   proxy?: ProxyConfig | null;
   fingerprint: FingerprintConfig;
   storageStatePlainPath: string;
   commentPool?: string[];
   dmMessage?: string;
+  reactionType?: string;
 };
 
 export type ActionResult = {
@@ -68,7 +101,7 @@ export type ActionResult = {
 
 export type ScrapeParams = {
   profileId: string;
-  platform: "instagram" | "twitter" | "facebook";
+  platform: Platform;
   sourceType: "hashtag" | "followers_of";
   seed: string;
   limit: number;
@@ -93,7 +126,7 @@ export type PostMetrics = {
 };
 
 export type MonitorParams = {
-  platform: "instagram" | "twitter" | "facebook";
+  platform: Platform;
   url: string;
   proxy?: ProxyConfig | null;
   fingerprint: FingerprintConfig;

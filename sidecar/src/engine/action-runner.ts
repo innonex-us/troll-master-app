@@ -5,10 +5,16 @@ import { resolveSpintax } from "./spintax.js";
 import * as instagram from "../platforms/instagram/actions.js";
 import * as twitter from "../platforms/twitter/actions.js";
 import * as facebook from "../platforms/facebook/actions.js";
+import * as tiktok from "../platforms/tiktok/actions.js";
+import * as linkedin from "../platforms/linkedin/actions.js";
+import * as youtube from "../platforms/youtube/actions.js";
 import { instagramConfig } from "../platforms/instagram/config.js";
 import { twitterConfig } from "../platforms/twitter/config.js";
 import { facebookConfig } from "../platforms/facebook/config.js";
-import type { ActionResult, ActionRunParams } from "./types.js";
+import { tiktokConfig } from "../platforms/tiktok/config.js";
+import { linkedinConfig } from "../platforms/linkedin/config.js";
+import { youtubeConfig } from "../platforms/youtube/config.js";
+import type { ActionResult, ActionRunParams, Platform } from "./types.js";
 
 function pickComment(pool?: string[]): string {
   if (!pool || pool.length === 0) return "🔥";
@@ -35,6 +41,8 @@ async function dispatchInstagram(page: Page, params: ActionRunParams): Promise<A
       return instagram.save(page, params.target);
     case "view_story":
       return instagram.viewStory(page, params.target);
+    case "react_story":
+      return instagram.reactStory(page, params.target, params.reactionType ?? "like", pickComment(params.commentPool));
     case "dm":
       return instagram.dm(page, params.target, pickDmMessage(params.dmMessage));
     default:
@@ -84,6 +92,91 @@ async function dispatchFacebook(page: Page, params: ActionRunParams): Promise<Ac
   }
 }
 
+const BASE_URL: Record<Platform, string> = {
+  instagram: instagramConfig.baseUrl,
+  twitter: twitterConfig.baseUrl,
+  facebook: facebookConfig.baseUrl,
+  tiktok: tiktokConfig.baseUrl,
+  linkedin: linkedinConfig.baseUrl,
+  youtube: youtubeConfig.baseUrl,
+};
+
+const DISPATCH: Record<Platform, (page: Page, params: ActionRunParams) => Promise<ActionResult>> = {
+  instagram: dispatchInstagram,
+  twitter: dispatchTwitter,
+  facebook: dispatchFacebook,
+  tiktok: dispatchTiktok,
+  linkedin: dispatchLinkedin,
+  youtube: dispatchYoutube,
+};
+
+async function dispatchTiktok(page: Page, params: ActionRunParams): Promise<ActionResult> {
+  switch (params.actionType) {
+    case "follow":
+      return tiktok.follow(page, params.target);
+    case "unfollow":
+      return tiktok.unfollow(page, params.target);
+    case "like":
+      return tiktok.like(page, params.target);
+    case "unlike":
+      return tiktok.unlike(page, params.target);
+    case "comment":
+      return tiktok.comment(page, params.target, pickComment(params.commentPool));
+    case "save":
+      return tiktok.save(page, params.target);
+    case "view_story":
+      return tiktok.viewStory(page, params.target);
+    case "react_story":
+      return tiktok.reactStory(page, params.target, params.reactionType ?? "like", pickComment(params.commentPool));
+    case "dm":
+      return tiktok.dm(page, params.target, pickDmMessage(params.dmMessage));
+    default:
+      return { status: "error", message: `unsupported TikTok action: ${params.actionType}` };
+  }
+}
+
+async function dispatchLinkedin(page: Page, params: ActionRunParams): Promise<ActionResult> {
+  switch (params.actionType) {
+    case "follow":
+      return linkedin.follow(page, params.target);
+    case "unfollow":
+      return linkedin.unfollow(page, params.target);
+    case "like":
+      return linkedin.like(page, params.target);
+    case "unlike":
+      return linkedin.unlike(page, params.target);
+    case "comment":
+      return linkedin.comment(page, params.target, pickComment(params.commentPool));
+    case "dm":
+      return linkedin.dm(page, params.target, pickDmMessage(params.dmMessage));
+    default:
+      return { status: "error", message: `unsupported LinkedIn action: ${params.actionType}` };
+  }
+}
+
+async function dispatchYoutube(page: Page, params: ActionRunParams): Promise<ActionResult> {
+  switch (params.actionType) {
+    case "follow":
+      return youtube.follow(page, params.target);
+    case "unfollow":
+      return youtube.unfollow(page, params.target);
+    case "like":
+      return youtube.like(page, params.target);
+    case "unlike":
+      return youtube.unlike(page, params.target);
+    case "comment":
+      return youtube.comment(page, params.target, pickComment(params.commentPool));
+    case "view_story":
+      return youtube.viewStory(page, params.target);
+    case "react_story":
+      return youtube.reactStory(page, params.target, params.reactionType ?? "like", pickComment(params.commentPool));
+    case "dm":
+      return youtube.dm(page, params.target, pickDmMessage(params.dmMessage));
+    default:
+      return { status: "error", message: `unsupported YouTube action: ${params.actionType}` };
+  }
+}
+
 export async function runAction(params: ActionRunParams): Promise<ActionResult> {
   const opened = await openContext({
     headless: true,
@@ -94,12 +187,7 @@ export async function runAction(params: ActionRunParams): Promise<ActionResult> 
 
   try {
     const page = await opened.context.newPage();
-    const baseUrl =
-      params.platform === "instagram"
-        ? instagramConfig.baseUrl
-        : params.platform === "twitter"
-          ? twitterConfig.baseUrl
-          : facebookConfig.baseUrl;
+    const baseUrl = BASE_URL[params.platform];
 
     await page.goto(baseUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
     const issue = await detectIssue(page, params.platform);
@@ -107,12 +195,7 @@ export async function runAction(params: ActionRunParams): Promise<ActionResult> 
       return { status: issue.issue, message: issue.detail };
     }
 
-    const result =
-      params.platform === "instagram"
-        ? await dispatchInstagram(page, params)
-        : params.platform === "twitter"
-          ? await dispatchTwitter(page, params)
-          : await dispatchFacebook(page, params);
+    const result = await DISPATCH[params.platform](page, params);
 
     // persist any refreshed cookies/tokens back to the same plaintext path;
     // the Rust core re-encrypts it and deletes this plaintext copy afterwards.

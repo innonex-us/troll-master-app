@@ -2,6 +2,7 @@ mod blacklist;
 mod campaign_rule_state;
 mod campaign_rules;
 mod campaigns;
+mod comment_replies;
 mod follow_history;
 mod groups;
 mod logs;
@@ -15,6 +16,7 @@ pub use blacklist::*;
 pub use campaign_rule_state::*;
 pub use campaign_rules::*;
 pub use campaigns::*;
+pub use comment_replies::*;
 pub use follow_history::*;
 pub use groups::*;
 pub use logs::*;
@@ -172,7 +174,34 @@ CREATE TABLE IF NOT EXISTS monitored_post_snapshots (
     captured_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS comment_reply_rules (
+    id TEXT PRIMARY KEY,
+    monitored_post_id TEXT NOT NULL REFERENCES monitored_posts(id) ON DELETE CASCADE,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    daily_limit INTEGER NOT NULL,
+    min_delay_sec INTEGER NOT NULL,
+    max_delay_sec INTEGER NOT NULL,
+    reply_pool TEXT NOT NULL DEFAULT '[]',
+    consecutive_errors INTEGER NOT NULL DEFAULT 0,
+    backoff_until TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(monitored_post_id)
+);
+
+CREATE TABLE IF NOT EXISTS monitored_post_comments (
+    id TEXT PRIMARY KEY,
+    monitored_post_id TEXT NOT NULL REFERENCES monitored_posts(id) ON DELETE CASCADE,
+    platform_comment_id TEXT NOT NULL,
+    author TEXT NOT NULL DEFAULT '',
+    text TEXT NOT NULL DEFAULT '',
+    replied INTEGER NOT NULL DEFAULT 0,
+    replied_at TEXT,
+    first_seen_at TEXT NOT NULL,
+    UNIQUE(monitored_post_id, platform_comment_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_action_log_profile_type ON action_log(profile_id, action_type, executed_at);
+CREATE INDEX IF NOT EXISTS idx_mpc_unreplied ON monitored_post_comments(monitored_post_id, replied);
 CREATE INDEX IF NOT EXISTS idx_action_rules_profile ON action_rules(profile_id);
 CREATE INDEX IF NOT EXISTS idx_follow_history_profile ON follow_history(profile_id, followed_at);
 CREATE INDEX IF NOT EXISTS idx_blacklist_username ON blacklist_entries(username);
@@ -228,6 +257,8 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     add_column_if_missing(conn, "profiles", "device_name", "TEXT NOT NULL DEFAULT ''")?;
     add_column_if_missing(conn, "profiles", "device_id", "TEXT NOT NULL DEFAULT ''")?;
     add_column_if_missing(conn, "profiles", "login_password_enc", "TEXT")?;
+    add_column_if_missing(conn, "action_rules", "reaction_type", "TEXT NOT NULL DEFAULT 'like'")?;
+    add_column_if_missing(conn, "campaign_rules", "reaction_type", "TEXT NOT NULL DEFAULT 'like'")?;
     Ok(())
 }
 

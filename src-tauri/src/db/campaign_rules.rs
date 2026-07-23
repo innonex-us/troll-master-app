@@ -15,6 +15,7 @@ pub struct CampaignRule {
     pub source_seed: String,
     pub dm_message: String,
     pub filter_skip_no_avatar: bool,
+    pub reaction_type: String,
     pub created_at: String,
 }
 
@@ -37,10 +38,16 @@ pub struct NewCampaignRule {
     pub dm_message: String,
     #[serde(default)]
     pub filter_skip_no_avatar: bool,
+    #[serde(default = "default_reaction_type")]
+    pub reaction_type: String,
 }
 
 fn default_source_type() -> String {
     "explicit".to_string()
+}
+
+fn default_reaction_type() -> String {
+    "like".to_string()
 }
 
 fn row_to_campaign_rule(row: &rusqlite::Row) -> rusqlite::Result<CampaignRule> {
@@ -59,6 +66,7 @@ fn row_to_campaign_rule(row: &rusqlite::Row) -> rusqlite::Result<CampaignRule> {
         source_seed: row.get("source_seed")?,
         dm_message: row.get("dm_message")?,
         filter_skip_no_avatar: row.get::<_, i64>("filter_skip_no_avatar")? != 0,
+        reaction_type: row.get("reaction_type")?,
         created_at: row.get("created_at")?,
     })
 }
@@ -69,8 +77,8 @@ pub fn insert_campaign_rule(conn: &Connection, new: &NewCampaignRule) -> rusqlit
     let target_source = serde_json::to_string(&new.target_source).unwrap();
     let comment_pool = serde_json::to_string(&new.comment_pool).unwrap();
     conn.execute(
-        "INSERT INTO campaign_rules (id, campaign_id, action_type, daily_limit, min_delay_sec, max_delay_sec, target_source, comment_pool, source_type, source_seed, dm_message, filter_skip_no_avatar, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+        "INSERT INTO campaign_rules (id, campaign_id, action_type, daily_limit, min_delay_sec, max_delay_sec, target_source, comment_pool, source_type, source_seed, dm_message, filter_skip_no_avatar, reaction_type, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
         params![
             id,
             new.campaign_id,
@@ -84,6 +92,7 @@ pub fn insert_campaign_rule(conn: &Connection, new: &NewCampaignRule) -> rusqlit
             new.source_seed,
             new.dm_message,
             new.filter_skip_no_avatar as i64,
+            new.reaction_type,
             now,
         ],
     )?;
@@ -138,13 +147,22 @@ pub fn action_valid_for_platform(action_type: &str, platform: &str) -> bool {
     match platform {
         "instagram" => matches!(
             action_type,
-            "follow" | "unfollow" | "like" | "unlike" | "comment" | "save" | "view_story" | "dm"
+            "follow" | "unfollow" | "like" | "unlike" | "comment" | "save" | "view_story" | "react_story" | "dm"
         ),
         "twitter" => matches!(
             action_type,
             "follow" | "unfollow" | "like" | "unlike" | "comment" | "retweet" | "unretweet" | "dm"
         ),
         "facebook" => matches!(action_type, "follow" | "unfollow" | "like" | "unlike" | "comment" | "dm"),
+        "tiktok" => matches!(
+            action_type,
+            "follow" | "unfollow" | "like" | "unlike" | "comment" | "save" | "view_story" | "react_story" | "dm"
+        ),
+        "linkedin" => matches!(action_type, "follow" | "unfollow" | "like" | "unlike" | "comment" | "dm"),
+        "youtube" => matches!(
+            action_type,
+            "follow" | "unfollow" | "like" | "unlike" | "comment" | "view_story" | "react_story" | "dm"
+        ),
         _ => false,
     }
 }

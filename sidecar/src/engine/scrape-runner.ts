@@ -3,21 +3,41 @@ import { detectIssue } from "./detection.js";
 import * as instagramScrape from "../platforms/instagram/scrape.js";
 import * as twitterScrape from "../platforms/twitter/scrape.js";
 import * as facebookScrape from "../platforms/facebook/scrape.js";
+import * as tiktokScrape from "../platforms/tiktok/scrape.js";
+import * as linkedinScrape from "../platforms/linkedin/scrape.js";
+import * as youtubeScrape from "../platforms/youtube/scrape.js";
 import { instagramConfig } from "../platforms/instagram/config.js";
 import { twitterConfig } from "../platforms/twitter/config.js";
 import { facebookConfig } from "../platforms/facebook/config.js";
-import type { ScrapeParams, ScrapeResult } from "./types.js";
+import { tiktokConfig } from "../platforms/tiktok/config.js";
+import { linkedinConfig } from "../platforms/linkedin/config.js";
+import { youtubeConfig } from "../platforms/youtube/config.js";
+import type { Platform, ScrapeParams, ScrapeResult } from "./types.js";
 
-function baseUrlFor(platform: ScrapeParams["platform"]): string {
-  if (platform === "instagram") return instagramConfig.baseUrl;
-  if (platform === "twitter") return twitterConfig.baseUrl;
-  return facebookConfig.baseUrl;
+const BASE_URL: Record<Platform, string> = {
+  instagram: instagramConfig.baseUrl,
+  twitter: twitterConfig.baseUrl,
+  facebook: facebookConfig.baseUrl,
+  tiktok: tiktokConfig.baseUrl,
+  linkedin: linkedinConfig.baseUrl,
+  youtube: youtubeConfig.baseUrl,
+};
+
+const SCRAPER: Record<Platform, typeof instagramScrape> = {
+  instagram: instagramScrape,
+  twitter: twitterScrape,
+  facebook: facebookScrape,
+  tiktok: tiktokScrape,
+  linkedin: linkedinScrape,
+  youtube: youtubeScrape,
+};
+
+function baseUrlFor(platform: Platform): string {
+  return BASE_URL[platform];
 }
 
-function scraperFor(platform: ScrapeParams["platform"]) {
-  if (platform === "instagram") return instagramScrape;
-  if (platform === "twitter") return twitterScrape;
-  return facebookScrape;
+function scraperFor(platform: Platform) {
+  return SCRAPER[platform];
 }
 
 export async function runScrape(params: ScrapeParams): Promise<ScrapeResult> {

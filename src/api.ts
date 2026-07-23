@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type Platform = "instagram" | "twitter" | "facebook";
+export type Platform = "instagram" | "twitter" | "facebook" | "tiktok" | "linkedin" | "youtube";
 export type ActionType =
   | "follow"
   | "unfollow"
@@ -10,6 +10,7 @@ export type ActionType =
   | "dm"
   | "save"
   | "view_story"
+  | "react_story"
   | "retweet"
   | "unretweet";
 
@@ -93,6 +94,7 @@ export type ActionRule = {
   backoff_until: string | null;
   dm_message: string;
   filter_skip_no_avatar: boolean;
+  reaction_type: string;
   created_at: string;
 };
 
@@ -108,6 +110,7 @@ export type NewActionRule = {
   source_seed: string;
   dm_message: string;
   filter_skip_no_avatar: boolean;
+  reaction_type: string;
 };
 
 export type PostMetrics = {
@@ -184,6 +187,7 @@ export type CampaignRule = {
   source_seed: string;
   dm_message: string;
   filter_skip_no_avatar: boolean;
+  reaction_type: string;
   created_at: string;
 };
 
@@ -199,6 +203,7 @@ export type NewCampaignRule = {
   source_seed: string;
   dm_message: string;
   filter_skip_no_avatar: boolean;
+  reaction_type: string;
 };
 
 export type EnrollResult = {

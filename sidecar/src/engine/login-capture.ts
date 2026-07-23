@@ -4,24 +4,44 @@ import { detectIssue } from "./detection.js";
 import { instagramConfig } from "../platforms/instagram/config.js";
 import { twitterConfig } from "../platforms/twitter/config.js";
 import { facebookConfig } from "../platforms/facebook/config.js";
+import { tiktokConfig } from "../platforms/tiktok/config.js";
+import { linkedinConfig } from "../platforms/linkedin/config.js";
+import { youtubeConfig } from "../platforms/youtube/config.js";
 import { fillLogin as fillInstagramLogin } from "../platforms/instagram/login.js";
 import { fillLogin as fillTwitterLogin } from "../platforms/twitter/login.js";
 import { fillLogin as fillFacebookLogin } from "../platforms/facebook/login.js";
-import type { AutoLoginParams, LoginCaptureParams, ActionResult } from "./types.js";
+import { fillLogin as fillTiktokLogin } from "../platforms/tiktok/login.js";
+import { fillLogin as fillLinkedinLogin } from "../platforms/linkedin/login.js";
+import { fillLogin as fillYoutubeLogin } from "../platforms/youtube/login.js";
+import type { AutoLoginParams, LoginCaptureParams, ActionResult, Platform } from "./types.js";
 
 const POLL_INTERVAL_MS = 2000;
 const TIMEOUT_MS = 5 * 60 * 1000;
 
-function platformConfig(platform: LoginCaptureParams["platform"]) {
-  if (platform === "instagram") return instagramConfig;
-  if (platform === "twitter") return twitterConfig;
-  return facebookConfig;
+const PLATFORM_CONFIG: Record<Platform, typeof instagramConfig> = {
+  instagram: instagramConfig,
+  twitter: twitterConfig,
+  facebook: facebookConfig,
+  tiktok: tiktokConfig,
+  linkedin: linkedinConfig,
+  youtube: youtubeConfig,
+};
+
+const FILL_LOGIN: Record<Platform, typeof fillInstagramLogin> = {
+  instagram: fillInstagramLogin,
+  twitter: fillTwitterLogin,
+  facebook: fillFacebookLogin,
+  tiktok: fillTiktokLogin,
+  linkedin: fillLinkedinLogin,
+  youtube: fillYoutubeLogin,
+};
+
+function platformConfig(platform: Platform) {
+  return PLATFORM_CONFIG[platform];
 }
 
-function fillLoginFor(platform: AutoLoginParams["platform"]) {
-  if (platform === "instagram") return fillInstagramLogin;
-  if (platform === "twitter") return fillTwitterLogin;
-  return fillFacebookLogin;
+function fillLoginFor(platform: Platform) {
+  return FILL_LOGIN[platform];
 }
 
 function sleep(ms: number) {
