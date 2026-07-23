@@ -4,6 +4,7 @@ import "./App.css";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ProfilesPage } from "./pages/ProfilesPage";
 import { CampaignsPage } from "./pages/CampaignsPage";
+import { PodsPage } from "./pages/PodsPage";
 import { ProxiesPage } from "./pages/ProxiesPage";
 import { MonitorPage } from "./pages/MonitorPage";
 import { LogsPage } from "./pages/LogsPage";
@@ -17,6 +18,7 @@ type Tab =
   | "overview"
   | "profiles"
   | "campaigns"
+  | "pods"
   | "proxies"
   | "monitor"
   | "blacklist"
@@ -28,6 +30,7 @@ const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: "overview", label: "Overview", icon: "◆" },
   { id: "profiles", label: "Profiles", icon: "▣" },
   { id: "campaigns", label: "Campaigns", icon: "▶" },
+  { id: "pods", label: "Pods", icon: "⬡" },
   { id: "proxies", label: "Proxies", icon: "◈" },
   { id: "monitor", label: "Monitor", icon: "◉" },
   { id: "blacklist", label: "Blacklist", icon: "⊘" },
@@ -76,6 +79,7 @@ function App() {
         {tab === "overview" && <OverviewPage />}
         {tab === "profiles" && <ProfilesPage />}
         {tab === "campaigns" && <CampaignsPage />}
+        {tab === "pods" && <PodsPage />}
         {tab === "proxies" && <ProxiesPage />}
         {tab === "monitor" && <MonitorPage />}
         {tab === "blacklist" && <BlacklistPage />}

@@ -1,13 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, ActionRule, ActionType, Platform, SourceType } from "../api";
+import { api, ActionRule, ActionType, DmSequenceProgress, DmSequenceStep, Platform, SourceType } from "../api";
+import { Modal } from "../components/Modal";
 
 const ACTIONS_BY_PLATFORM: Record<Platform, ActionType[]> = {
-  instagram: ["follow", "unfollow", "like", "unlike", "comment", "save", "view_story", "react_story", "dm"],
-  twitter: ["follow", "unfollow", "like", "unlike", "comment", "retweet", "unretweet", "dm"],
-  facebook: ["follow", "unfollow", "like", "unlike", "comment", "dm"],
-  tiktok: ["follow", "unfollow", "like", "unlike", "comment", "save", "view_story", "react_story", "dm"],
-  linkedin: ["follow", "unfollow", "like", "unlike", "comment", "dm"],
-  youtube: ["follow", "unfollow", "like", "unlike", "comment", "view_story", "react_story", "dm"],
+  instagram: ["follow", "unfollow", "like", "unlike", "comment", "save", "view_story", "react_story", "dm", "dm_sequence"],
+  twitter: ["follow", "unfollow", "like", "unlike", "comment", "retweet", "unretweet", "dm", "dm_sequence"],
+  facebook: ["follow", "unfollow", "like", "unlike", "comment", "dm", "dm_sequence"],
+  tiktok: ["follow", "unfollow", "like", "unlike", "comment", "save", "view_story", "react_story", "dm", "dm_sequence"],
+  linkedin: ["follow", "unfollow", "like", "unlike", "comment", "dm", "dm_sequence"],
+  youtube: ["follow", "unfollow", "like", "unlike", "comment", "view_story", "react_story", "dm", "dm_sequence"],
 };
 
 // which non-explicit source(s) make sense for each action, and whether targets are
@@ -22,6 +23,8 @@ const ACTION_META: Record<ActionType, { sources: SourceType[]; targetKind: "user
   view_story: { sources: ["followers_of"], targetKind: "username" },
   react_story: { sources: ["followers_of"], targetKind: "username" },
   dm: { sources: ["followers_of"], targetKind: "username" },
+  dm_sequence: { sources: ["followers_of"], targetKind: "username" },
+  reply_comment: { sources: [], targetKind: "url" },
   retweet: { sources: ["hashtag"], targetKind: "url" },
   unretweet: { sources: [], targetKind: "url" },
 };
@@ -48,10 +51,31 @@ export function RulesPanel({ profileId, platform }: { profileId: string; platfor
   const [comments, setComments] = useState("");
   const [dmMessage, setDmMessage] = useState("");
   const [reactionType, setReactionType] = useState("like");
+  const [sequenceSteps, setSequenceSteps] = useState<DmSequenceStep[]>([{ order: 0, delay_hours: 0, message: "" }]);
   const [sourceType, setSourceType] = useState<SourceType>("explicit");
   const [sourceSeed, setSourceSeed] = useState("");
   const [daysThreshold, setDaysThreshold] = useState(3);
   const [skipNoAvatar, setSkipNoAvatar] = useState(false);
+
+  const [progressRule, setProgressRule] = useState<ActionRule | null>(null);
+  const [progress, setProgress] = useState<DmSequenceProgress[]>([]);
+
+  function addStep() {
+    setSequenceSteps((steps) => [...steps, { order: steps.length, delay_hours: 24, message: "" }]);
+  }
+
+  function updateStep(index: number, patch: Partial<DmSequenceStep>) {
+    setSequenceSteps((steps) => steps.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  }
+
+  function removeStep(index: number) {
+    setSequenceSteps((steps) => steps.filter((_, i) => i !== index).map((s, i) => ({ ...s, order: i })));
+  }
+
+  async function openProgress(rule: ActionRule) {
+    setProgress(await api.listDmSequenceProgress(rule.id));
+    setProgressRule(rule);
+  }
 
   async function refresh() {
     setLoading(true);
@@ -100,11 +124,13 @@ export function RulesPanel({ profileId, platform }: { profileId: string; platfor
         dm_message: dmMessage,
         filter_skip_no_avatar: skipNoAvatar,
         reaction_type: reactionType,
+        sequence_steps: actionType === "dm_sequence" ? sequenceSteps.filter((s) => s.message.trim()) : [],
       });
       setTargets("");
       setComments("");
       setDmMessage("");
       setSourceSeed("");
+      setSequenceSteps([{ order: 0, delay_hours: 0, message: "" }]);
       await refresh();
     } catch (err) {
       setError(String(err));
@@ -201,6 +227,11 @@ export function RulesPanel({ profileId, platform }: { profileId: string; platfor
                   <input type="checkbox" checked={rule.enabled} onChange={() => toggleRule(rule)} />
                 </td>
                 <td>
+                  {rule.action_type === "dm_sequence" && (
+                    <button type="button" className="ghost" onClick={() => openProgress(rule)}>
+                      View Progress
+                    </button>
+                  )}
                   <button type="button" className="danger" onClick={() => removeRule(rule.id)}>
                     Delete
                   </button>
@@ -318,10 +349,76 @@ export function RulesPanel({ profileId, platform }: { profileId: string; platfor
             rows={2}
           />
         )}
+        {actionType === "dm_sequence" && (
+          <div className="sequence-editor">
+            <p className="hint">
+              Each target walks these steps in order — a delay in hours after the previous
+              step before the next message sends.
+            </p>
+            {sequenceSteps.map((step, i) => (
+              <div className="row" key={i}>
+                <span className="hint">Step {i + 1}</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={step.delay_hours}
+                  onChange={(e) => updateStep(i, { delay_hours: Number(e.target.value) })}
+                  title="delay in hours after previous step"
+                />
+                <textarea
+                  placeholder="message template — supports {spintax|variants}"
+                  value={step.message}
+                  onChange={(e) => updateStep(i, { message: e.target.value })}
+                  rows={2}
+                />
+                {sequenceSteps.length > 1 && (
+                  <button type="button" className="ghost" onClick={() => removeStep(i)}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+            <button type="button" className="ghost" onClick={addStep}>
+              + Add Step
+            </button>
+          </div>
+        )}
         <button type="submit" className="primary">
           Add Rule
         </button>
       </form>
+
+      {progressRule && (
+        <Modal title="DM Sequence Progress" onClose={() => setProgressRule(null)}>
+          <table className="mini-table">
+            <thead>
+              <tr>
+                <th>Target</th>
+                <th>Step</th>
+                <th>Status</th>
+                <th>Next send</th>
+              </tr>
+            </thead>
+            <tbody>
+              {progress.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.target}</td>
+                  <td>{p.current_step + 1}</td>
+                  <td>{p.status}</td>
+                  <td>{p.status === "active" ? new Date(p.next_send_at).toLocaleString() : "—"}</td>
+                </tr>
+              ))}
+              {progress.length === 0 && (
+                <tr>
+                  <td className="empty" colSpan={4}>
+                    No targets enrolled yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </Modal>
+      )}
     </div>
   );
 }

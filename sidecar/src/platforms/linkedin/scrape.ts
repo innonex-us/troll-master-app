@@ -53,3 +53,20 @@ export async function scrapeFollowersOf(page: Page, username: string, limit: num
   }
   return Array.from(handles).slice(0, limit);
 }
+
+/** Reads a profile's recent-activity feed and returns the newest post URL, if
+ * any — used by Engagement Pods to detect a member's newest own post. */
+export async function scrapeLatestOwnPost(page: Page, username: string): Promise<string | null> {
+  const handle = username.replace(/^@/, "");
+  await page.goto(`${linkedinConfig.baseUrl}/in/${handle}/recent-activity/all/`, {
+    waitUntil: "domcontentloaded",
+  });
+  await page.waitForTimeout(1200);
+
+  const href = await page
+    .locator('a[href*="/feed/update/urn:li:activity:"]')
+    .first()
+    .evaluate((el) => (el as HTMLAnchorElement).href)
+    .catch(() => null);
+  return href ? href.split("?")[0] : null;
+}

@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import type { PostMetrics } from "../../engine/types.js";
+import type { PostMetrics, ScrapedComment } from "../../engine/types.js";
 import { parseCount } from "../../engine/parse-count.js";
 
 /**
@@ -33,4 +33,26 @@ export async function scrapePostMetrics(page: Page, url: string): Promise<PostMe
   const views = parseCount(viewsText?.match(/([\d,.]+[KMB]?)/)?.[1]);
 
   return { likes, comments, views };
+}
+
+/** Reads visible comments under a YouTube video (`ytd-comment-thread-renderer`
+ * blocks). `id` is a synthetic author+text hash. Best-effort, first ~20
+ * visible comments only (comments below the fold aren't loaded without
+ * scrolling, which this doesn't do). */
+export async function scrapeComments(page: Page, url: string): Promise<ScrapedComment[]> {
+  await page.goto(url, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1500);
+  await page.mouse.wheel(0, 1200).catch(() => {});
+  await page.waitForTimeout(800);
+
+  const rows = await page.locator("ytd-comment-thread-renderer").evaluateAll((els) =>
+    els.slice(0, 20).map((el) => ({
+      author: el.querySelector("#author-text")?.textContent?.trim() ?? "",
+      text: el.querySelector("#content-text")?.textContent?.trim() ?? "",
+    })),
+  );
+
+  return rows
+    .filter((r) => r.author && r.text)
+    .map((r) => ({ id: `${r.author}:${r.text}`.slice(0, 200), author: r.author, text: r.text }));
 }

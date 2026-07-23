@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, MonitoredPost, MonitoredPostSnapshot, Platform, Profile } from "../api";
+import { api, CommentReplyRule, MonitoredPost, MonitoredPostSnapshot, Platform, Profile } from "../api";
 import { Modal } from "../components/Modal";
 
 function formatMetric(value: number | null): string {
@@ -15,6 +15,13 @@ export function MonitorPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState<Record<string, string>>({});
+
+  const [replyPost, setReplyPost] = useState<MonitoredPost | null>(null);
+  const [replyRule, setReplyRule] = useState<CommentReplyRule | null>(null);
+  const [replyDailyLimit, setReplyDailyLimit] = useState(10);
+  const [replyMinDelay, setReplyMinDelay] = useState(300);
+  const [replyMaxDelay, setReplyMaxDelay] = useState(1800);
+  const [replyPool, setReplyPool] = useState("");
 
   const [platform, setPlatform] = useState<Platform>("instagram");
   const [url, setUrl] = useState("");
@@ -78,6 +85,51 @@ export function MonitorPage() {
     setHistoryPost(post);
   }
 
+  async function openReplyManager(post: MonitoredPost) {
+    const rule = await api.getReplyRule(post.id);
+    setReplyRule(rule);
+    setReplyDailyLimit(rule?.daily_limit ?? 10);
+    setReplyMinDelay(rule?.min_delay_sec ?? 300);
+    setReplyMaxDelay(rule?.max_delay_sec ?? 1800);
+    setReplyPool(rule?.reply_pool.join("\n") ?? "");
+    setReplyPost(post);
+  }
+
+  async function saveReplyRule(e: FormEvent) {
+    e.preventDefault();
+    if (!replyPost) return;
+    const pool = replyPool
+      .split("\n")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    try {
+      const saved = await api.upsertReplyRule({
+        monitored_post_id: replyPost.id,
+        daily_limit: replyDailyLimit,
+        min_delay_sec: replyMinDelay,
+        max_delay_sec: replyMaxDelay,
+        reply_pool: pool,
+      });
+      setReplyRule(saved);
+      setError("");
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
+  async function toggleReplyRule() {
+    if (!replyRule) return;
+    await api.setReplyRuleEnabled(replyRule.id, !replyRule.enabled);
+    setReplyRule({ ...replyRule, enabled: !replyRule.enabled });
+  }
+
+  async function removeReplyRule() {
+    if (!replyRule) return;
+    await api.deleteReplyRule(replyRule.id);
+    setReplyRule(null);
+    setReplyPool("");
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -129,6 +181,9 @@ export function MonitorPage() {
                     </button>
                     <button type="button" onClick={() => openHistory(post)}>
                       History
+                    </button>
+                    <button type="button" onClick={() => openReplyManager(post)}>
+                      Manage Auto-Reply
                     </button>
                     <button type="button" className="danger" onClick={() => removePost(post.id)}>
                       Delete
@@ -221,6 +276,63 @@ export function MonitorPage() {
               )}
             </tbody>
           </table>
+        </Modal>
+      )}
+
+      {replyPost && (
+        <Modal title={`Auto-Reply — ${replyPost.label || replyPost.url}`} onClose={() => setReplyPost(null)}>
+          <p className="hint">
+            Watches this post's comments and auto-replies with a spintax pool once new
+            ones appear. Only meaningful for posts you own — the reply is posted using
+            the same viewer account tracking this post.
+          </p>
+          <form className="row" onSubmit={saveReplyRule}>
+            <input
+              type="number"
+              min={1}
+              value={replyDailyLimit}
+              onChange={(e) => setReplyDailyLimit(Number(e.target.value))}
+              title="daily reply limit"
+            />
+            <input
+              type="number"
+              min={1}
+              value={replyMinDelay}
+              onChange={(e) => setReplyMinDelay(Number(e.target.value))}
+              title="min delay seconds"
+            />
+            <input
+              type="number"
+              min={1}
+              value={replyMaxDelay}
+              onChange={(e) => setReplyMaxDelay(Number(e.target.value))}
+              title="max delay seconds"
+            />
+            <textarea
+              placeholder="reply pool, one per line — supports {spintax|variants}"
+              value={replyPool}
+              onChange={(e) => setReplyPool(e.target.value)}
+              rows={3}
+            />
+            <button type="submit" className="primary">
+              {replyRule ? "Update Auto-Reply" : "Enable Auto-Reply"}
+            </button>
+          </form>
+          {replyRule && (
+            <div className="row">
+              <label className="hint">
+                <input type="checkbox" checked={replyRule.enabled} onChange={toggleReplyRule} /> enabled
+              </label>
+              <span className="hint">
+                {replyRule.consecutive_errors > 0
+                  ? `${replyRule.consecutive_errors} recent errors`
+                  : "ok"}
+              </span>
+              <button type="button" className="danger" onClick={removeReplyRule}>
+                Remove Auto-Reply
+              </button>
+            </div>
+          )}
         </Modal>
       )}
     </div>

@@ -3,7 +3,15 @@ import { runLoginCapture, runAutoLogin } from "./engine/login-capture.js";
 import { runAction } from "./engine/action-runner.js";
 import { runScrape } from "./engine/scrape-runner.js";
 import { runMonitorScrape } from "./engine/monitor-runner.js";
-import type { ActionRunParams, AutoLoginParams, LoginCaptureParams, MonitorParams, ScrapeParams } from "./engine/types.js";
+import { runOwnLatestPost } from "./engine/own-post-runner.js";
+import type {
+  ActionRunParams,
+  AutoLoginParams,
+  LoginCaptureParams,
+  MonitorParams,
+  OwnPostParams,
+  ScrapeParams,
+} from "./engine/types.js";
 
 registerHandler("ping", () => {
   return { pong: true, ts: Date.now() };
@@ -27,6 +35,10 @@ registerHandler("targets.scrape", (params) => {
 
 registerHandler("monitor.scrapeMetrics", (params) => {
   return runMonitorScrape(params as MonitorParams);
+});
+
+registerHandler("own.latestPost", (params) => {
+  return runOwnLatestPost(params as OwnPostParams);
 });
 
 startRpcServer();

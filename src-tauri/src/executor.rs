@@ -283,6 +283,101 @@ pub async fn scrape_post_metrics(
     serde_json::from_value(metrics).map_err(|e| e.to_string())
 }
 
+#[derive(serde::Deserialize)]
+pub struct ScrapedComment {
+    pub id: String,
+    pub author: String,
+    pub text: String,
+}
+
+/// Scrapes a post's current comments using a viewer profile's logged-in session —
+/// same RPC as `scrape_post_metrics` but with `includeComments` set, used by the
+/// comment-reply scheduler tick to detect newly-posted comments to reply to.
+pub async fn scrape_post_comments(
+    state: &AppState,
+    viewer_profile: &Profile,
+    url: &str,
+) -> Result<Vec<ScrapedComment>, String> {
+    let enc_path = match &viewer_profile.storage_state_enc_path {
+        Some(p) => Path::new(p).to_path_buf(),
+        None => return Err("viewer profile has no captured login session".to_string()),
+    };
+
+    let tmp_path = storage::tmp_plain_path(&state.app_data_dir, &viewer_profile.id);
+    crypto::decrypt_to_file(&enc_path, &tmp_path).map_err(|e| e.to_string())?;
+
+    let proxy = load_proxy(&state.db, viewer_profile);
+    let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
+    let call_result = client
+        .call(
+            "monitor.scrapeMetrics",
+            json!({
+                "platform": viewer_profile.platform,
+                "url": url,
+                "proxy": proxy_json(&proxy),
+                "fingerprint": fingerprint_json(viewer_profile),
+                "storageStatePlainPath": tmp_path.to_string_lossy(),
+                "includeComments": true,
+            }),
+        )
+        .await;
+
+    if tmp_path.exists() {
+        let _ = crypto::encrypt_file(&tmp_path, &enc_path);
+    }
+
+    let value = call_result?;
+    let status = value.get("status").and_then(|v| v.as_str()).unwrap_or("error");
+    if status != "success" {
+        let message = value.get("message").and_then(|v| v.as_str()).unwrap_or("scrape failed").to_string();
+        return Err(message);
+    }
+
+    let comments = value.get("comments").cloned().unwrap_or(Value::Array(vec![]));
+    serde_json::from_value(comments).map_err(|e| e.to_string())
+}
+
+/// Fetches a profile's single newest post/video URL using its own logged-in
+/// session — used by Engagement Pods to auto-detect when a member has
+/// published something new, without the user manually registering the post.
+pub async fn fetch_latest_own_post(state: &AppState, member_profile: &Profile) -> Result<Option<String>, String> {
+    let enc_path = match &member_profile.storage_state_enc_path {
+        Some(p) => Path::new(p).to_path_buf(),
+        None => return Err("profile has no captured login session".to_string()),
+    };
+
+    let tmp_path = storage::tmp_plain_path(&state.app_data_dir, &member_profile.id);
+    crypto::decrypt_to_file(&enc_path, &tmp_path).map_err(|e| e.to_string())?;
+
+    let proxy = load_proxy(&state.db, member_profile);
+    let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
+    let call_result = client
+        .call(
+            "own.latestPost",
+            json!({
+                "platform": member_profile.platform,
+                "username": member_profile.username,
+                "proxy": proxy_json(&proxy),
+                "fingerprint": fingerprint_json(member_profile),
+                "storageStatePlainPath": tmp_path.to_string_lossy(),
+            }),
+        )
+        .await;
+
+    if tmp_path.exists() {
+        let _ = crypto::encrypt_file(&tmp_path, &enc_path);
+    }
+
+    let value = call_result?;
+    let status = value.get("status").and_then(|v| v.as_str()).unwrap_or("error");
+    if status != "success" {
+        let message = value.get("message").and_then(|v| v.as_str()).unwrap_or("scrape failed").to_string();
+        return Err(message);
+    }
+
+    Ok(value.get("url").and_then(|v| v.as_str()).map(|s| s.to_string()))
+}
+
 pub struct ActionOutcome {
     pub status: String,
     pub message: String,

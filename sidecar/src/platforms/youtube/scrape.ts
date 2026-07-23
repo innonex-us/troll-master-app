@@ -53,3 +53,18 @@ export async function scrapeFollowersOf(page: Page, username: string, limit: num
   }
   return Array.from(handles).slice(0, limit);
 }
+
+/** Reads a channel's Videos tab and returns the newest video URL, if any —
+ * used by Engagement Pods to detect a member's newest own post. */
+export async function scrapeLatestOwnPost(page: Page, username: string): Promise<string | null> {
+  const handle = username.replace(/^@/, "");
+  await page.goto(`${youtubeConfig.baseUrl}/@${handle}/videos`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1200);
+
+  const href = await page
+    .locator('a#video-title-link, a[href*="/watch?v="]')
+    .first()
+    .evaluate((el) => (el as HTMLAnchorElement).href)
+    .catch(() => null);
+  return href ? href.split("&")[0] : null;
+}

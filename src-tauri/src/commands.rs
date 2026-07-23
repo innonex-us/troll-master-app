@@ -487,6 +487,121 @@ pub async fn auto_login_cmd(state: State<'_, Arc<AppState>>, profile_id: String)
 }
 
 #[tauri::command]
+pub async fn get_reply_rule_cmd(
+    state: State<'_, Arc<AppState>>,
+    monitored_post_id: String,
+) -> Result<Option<db::CommentReplyRule>, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::get_reply_rule(&conn, &monitored_post_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn upsert_reply_rule_cmd(
+    state: State<'_, Arc<AppState>>,
+    new_rule: db::NewCommentReplyRule,
+) -> Result<db::CommentReplyRule, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::upsert_reply_rule(&conn, &new_rule).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_reply_rule_enabled_cmd(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::set_reply_rule_enabled(&conn, &id, enabled).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_reply_rule_cmd(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::delete_reply_rule(&conn, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_dm_sequence_progress_cmd(
+    state: State<'_, Arc<AppState>>,
+    rule_id: String,
+) -> Result<Vec<db::DmSequenceProgress>, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::list_progress_for_rule(&conn, &rule_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_pods_cmd(state: State<'_, Arc<AppState>>) -> Result<Vec<db::Pod>, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::list_pods(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn create_pod_cmd(state: State<'_, Arc<AppState>>, new_pod: db::NewPod) -> Result<db::Pod, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::insert_pod(&conn, &new_pod).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_pod_enabled_cmd(state: State<'_, Arc<AppState>>, id: String, enabled: bool) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::set_pod_enabled(&conn, &id, enabled).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_pod_cmd(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::delete_pod(&conn, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_pod_members_cmd(
+    state: State<'_, Arc<AppState>>,
+    pod_id: String,
+) -> Result<Vec<db::PodMember>, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::list_pod_members(&conn, &pod_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn add_pod_member_cmd(
+    state: State<'_, Arc<AppState>>,
+    pod_id: String,
+    profile_id: String,
+) -> Result<db::PodMember, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::add_pod_member(&conn, &pod_id, &profile_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn remove_pod_member_cmd(
+    state: State<'_, Arc<AppState>>,
+    pod_id: String,
+    profile_id: String,
+) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::remove_pod_member(&conn, &pod_id, &profile_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_pod_posts_cmd(
+    state: State<'_, Arc<AppState>>,
+    pod_id: String,
+    limit: i64,
+) -> Result<Vec<db::PodPost>, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::list_pod_posts(&conn, &pod_id, limit).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_pod_engagements_cmd(
+    state: State<'_, Arc<AppState>>,
+    pod_post_id: String,
+) -> Result<Vec<db::PodEngagement>, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::list_engagements_for_post(&conn, &pod_post_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn import_cookies_cmd(
     state: State<'_, Arc<AppState>>,
     profile_id: String,

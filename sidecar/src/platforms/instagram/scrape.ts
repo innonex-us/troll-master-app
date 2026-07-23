@@ -65,3 +65,14 @@ export async function scrapeFollowersOf(
   }
   return Array.from(usernames).slice(0, limit);
 }
+
+/** Reads a profile's grid and returns the newest post/reel URL, if any —
+ * used by Engagement Pods to detect a member's newest own post. */
+export async function scrapeLatestOwnPost(page: Page, username: string): Promise<string | null> {
+  const handle = username.replace(/^@/, "");
+  await page.goto(`${instagramConfig.baseUrl}/${handle}/`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1000);
+
+  const href = await page.locator('a[href^="/p/"], a[href^="/reel/"]').first().getAttribute("href").catch(() => null);
+  return href ? `${instagramConfig.baseUrl}${href}` : null;
+}

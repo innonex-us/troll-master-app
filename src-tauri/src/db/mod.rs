@@ -3,10 +3,12 @@ mod campaign_rule_state;
 mod campaign_rules;
 mod campaigns;
 mod comment_replies;
+mod dm_sequences;
 mod follow_history;
 mod groups;
 mod logs;
 mod monitoring;
+mod pods;
 mod profiles;
 mod proxies;
 mod rules;
@@ -17,10 +19,12 @@ pub use campaign_rule_state::*;
 pub use campaign_rules::*;
 pub use campaigns::*;
 pub use comment_replies::*;
+pub use dm_sequences::*;
 pub use follow_history::*;
 pub use groups::*;
 pub use logs::*;
 pub use monitoring::*;
+pub use pods::*;
 pub use profiles::*;
 pub use proxies::*;
 pub use rules::*;
@@ -184,6 +188,7 @@ CREATE TABLE IF NOT EXISTS comment_reply_rules (
     reply_pool TEXT NOT NULL DEFAULT '[]',
     consecutive_errors INTEGER NOT NULL DEFAULT 0,
     backoff_until TEXT,
+    last_checked_at TEXT,
     created_at TEXT NOT NULL,
     UNIQUE(monitored_post_id)
 );
@@ -200,8 +205,67 @@ CREATE TABLE IF NOT EXISTS monitored_post_comments (
     UNIQUE(monitored_post_id, platform_comment_id)
 );
 
+CREATE TABLE IF NOT EXISTS dm_sequence_progress (
+    id TEXT PRIMARY KEY,
+    rule_id TEXT NOT NULL REFERENCES action_rules(id) ON DELETE CASCADE,
+    target TEXT NOT NULL,
+    current_step INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active',
+    next_send_at TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(rule_id, target)
+);
+
+CREATE TABLE IF NOT EXISTS pods (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    window_hours INTEGER NOT NULL DEFAULT 6,
+    daily_limit_per_member INTEGER NOT NULL DEFAULT 10,
+    min_delay_sec INTEGER NOT NULL DEFAULT 120,
+    max_delay_sec INTEGER NOT NULL DEFAULT 900,
+    actions TEXT NOT NULL DEFAULT '["like"]',
+    comment_pool TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pod_members (
+    id TEXT PRIMARY KEY,
+    pod_id TEXT NOT NULL REFERENCES pods(id) ON DELETE CASCADE,
+    profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    last_checked_at TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(pod_id, profile_id)
+);
+
+CREATE TABLE IF NOT EXISTS pod_posts (
+    id TEXT PRIMARY KEY,
+    pod_id TEXT NOT NULL REFERENCES pods(id) ON DELETE CASCADE,
+    member_profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    post_url TEXT NOT NULL,
+    detected_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    UNIQUE(pod_id, post_url)
+);
+
+CREATE TABLE IF NOT EXISTS pod_engagements (
+    id TEXT PRIMARY KEY,
+    pod_post_id TEXT NOT NULL REFERENCES pod_posts(id) ON DELETE CASCADE,
+    acting_profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    action_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    executed_at TEXT NOT NULL,
+    UNIQUE(pod_post_id, acting_profile_id, action_type)
+);
+
 CREATE INDEX IF NOT EXISTS idx_action_log_profile_type ON action_log(profile_id, action_type, executed_at);
 CREATE INDEX IF NOT EXISTS idx_mpc_unreplied ON monitored_post_comments(monitored_post_id, replied);
+CREATE INDEX IF NOT EXISTS idx_dm_seq_due ON dm_sequence_progress(rule_id, status, next_send_at);
+CREATE INDEX IF NOT EXISTS idx_pod_posts_active ON pod_posts(pod_id, expires_at);
+CREATE INDEX IF NOT EXISTS idx_pod_engagements_post ON pod_engagements(pod_post_id);
 CREATE INDEX IF NOT EXISTS idx_action_rules_profile ON action_rules(profile_id);
 CREATE INDEX IF NOT EXISTS idx_follow_history_profile ON follow_history(profile_id, followed_at);
 CREATE INDEX IF NOT EXISTS idx_blacklist_username ON blacklist_entries(username);
@@ -259,6 +323,7 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     add_column_if_missing(conn, "profiles", "login_password_enc", "TEXT")?;
     add_column_if_missing(conn, "action_rules", "reaction_type", "TEXT NOT NULL DEFAULT 'like'")?;
     add_column_if_missing(conn, "campaign_rules", "reaction_type", "TEXT NOT NULL DEFAULT 'like'")?;
+    add_column_if_missing(conn, "action_rules", "sequence_steps", "TEXT NOT NULL DEFAULT '[]'")?;
     Ok(())
 }
 

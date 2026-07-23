@@ -55,3 +55,19 @@ export async function scrapeFollowersOf(page: Page, username: string, limit: num
   }
   return Array.from(handles).slice(0, limit);
 }
+
+/** Reads a profile's timeline and returns the newest post URL, if any — used
+ * by Engagement Pods to detect a member's newest own post. Same fragile
+ * link-shape heuristic as `scrapeHashtag`. */
+export async function scrapeLatestOwnPost(page: Page, username: string): Promise<string | null> {
+  const handle = username.replace(/^@/, "");
+  await page.goto(`${facebookConfig.baseUrl}/${handle}`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1200);
+
+  const href = await page
+    .locator('a[href*="/posts/"], a[href*="/videos/"], a[href*="/photo/"]')
+    .first()
+    .evaluate((el) => (el as HTMLAnchorElement).href)
+    .catch(() => null);
+  return href ?? null;
+}

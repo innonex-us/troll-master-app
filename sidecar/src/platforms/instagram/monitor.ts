@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import type { PostMetrics } from "../../engine/types.js";
+import type { PostMetrics, ScrapedComment } from "../../engine/types.js";
 import { parseCount } from "../../engine/parse-count.js";
 
 /**
@@ -26,4 +26,26 @@ export async function scrapePostMetrics(page: Page, url: string): Promise<PostMe
     likes: parseCount(likesMatch?.[1]),
     comments: parseCount(commentsMatch?.[1]),
   };
+}
+
+/**
+ * Reads the visible comment thread under a post. Instagram's comment DOM has no
+ * stable per-comment id exposed to scraping, so `id` is a synthetic hash of
+ * author+text used only for local de-duplication — an edited comment will be
+ * (mis)treated as a new one. Best-effort, first ~20 visible comments only.
+ */
+export async function scrapeComments(page: Page, url: string): Promise<ScrapedComment[]> {
+  await page.goto(url, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1200);
+
+  const rows = await page.locator("ul ul li").evaluateAll((els) =>
+    els.slice(0, 20).map((el) => ({
+      author: el.querySelector("a[role='link']")?.textContent?.trim() ?? "",
+      text: el.querySelector("span")?.textContent?.trim() ?? "",
+    })),
+  );
+
+  return rows
+    .filter((r) => r.author && r.text)
+    .map((r) => ({ id: `${r.author}:${r.text}`.slice(0, 200), author: r.author, text: r.text }));
 }

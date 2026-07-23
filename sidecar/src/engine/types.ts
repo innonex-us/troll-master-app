@@ -38,7 +38,8 @@ export type InstagramActionType =
   | "dm"
   | "save"
   | "view_story"
-  | "react_story";
+  | "react_story"
+  | "reply_comment";
 
 export type TwitterActionType =
   | "follow"
@@ -48,9 +49,17 @@ export type TwitterActionType =
   | "comment"
   | "dm"
   | "retweet"
-  | "unretweet";
+  | "unretweet"
+  | "reply_comment";
 
-export type FacebookActionType = "follow" | "unfollow" | "like" | "unlike" | "comment" | "dm";
+export type FacebookActionType =
+  | "follow"
+  | "unfollow"
+  | "like"
+  | "unlike"
+  | "comment"
+  | "dm"
+  | "reply_comment";
 
 export type TiktokActionType =
   | "follow"
@@ -61,9 +70,17 @@ export type TiktokActionType =
   | "dm"
   | "save"
   | "view_story"
-  | "react_story";
+  | "react_story"
+  | "reply_comment";
 
-export type LinkedinActionType = "follow" | "unfollow" | "like" | "unlike" | "comment" | "dm";
+export type LinkedinActionType =
+  | "follow"
+  | "unfollow"
+  | "like"
+  | "unlike"
+  | "comment"
+  | "dm"
+  | "reply_comment";
 
 export type YoutubeActionType =
   | "follow"
@@ -73,7 +90,8 @@ export type YoutubeActionType =
   | "comment"
   | "dm"
   | "view_story"
-  | "react_story";
+  | "react_story"
+  | "reply_comment";
 
 export type ActionRunParams = {
   profileId: string;
@@ -131,10 +149,34 @@ export type MonitorParams = {
   proxy?: ProxyConfig | null;
   fingerprint: FingerprintConfig;
   storageStatePlainPath: string;
+  includeComments?: boolean;
+};
+
+export type ScrapedComment = {
+  /** Synthetic id derived from author+text — these platforms don't reliably
+   * expose a real stable comment id via DOM scraping. */
+  id: string;
+  author: string;
+  text: string;
 };
 
 export type MonitorResult = {
   status: "success" | "error";
   metrics: PostMetrics;
+  message: string;
+  comments?: ScrapedComment[];
+};
+
+export type OwnPostParams = {
+  platform: Platform;
+  username: string;
+  proxy?: ProxyConfig | null;
+  fingerprint: FingerprintConfig;
+  storageStatePlainPath: string;
+};
+
+export type OwnPostResult = {
+  status: "success" | "error";
+  url: string | null;
   message: string;
 };

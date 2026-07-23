@@ -1,18 +1,18 @@
 import { closeContext, openContext } from "./browser.js";
 import { detectIssue } from "./detection.js";
-import { scrapePostMetrics as scrapeInstagramMetrics } from "../platforms/instagram/monitor.js";
-import { scrapeTweetMetrics } from "../platforms/twitter/monitor.js";
-import { scrapePostMetrics as scrapeFacebookMetrics } from "../platforms/facebook/monitor.js";
-import { scrapePostMetrics as scrapeTiktokMetrics } from "../platforms/tiktok/monitor.js";
-import { scrapePostMetrics as scrapeLinkedinMetrics } from "../platforms/linkedin/monitor.js";
-import { scrapePostMetrics as scrapeYoutubeMetrics } from "../platforms/youtube/monitor.js";
+import { scrapePostMetrics as scrapeInstagramMetrics, scrapeComments as scrapeInstagramComments } from "../platforms/instagram/monitor.js";
+import { scrapeTweetMetrics, scrapeComments as scrapeTwitterComments } from "../platforms/twitter/monitor.js";
+import { scrapePostMetrics as scrapeFacebookMetrics, scrapeComments as scrapeFacebookComments } from "../platforms/facebook/monitor.js";
+import { scrapePostMetrics as scrapeTiktokMetrics, scrapeComments as scrapeTiktokComments } from "../platforms/tiktok/monitor.js";
+import { scrapePostMetrics as scrapeLinkedinMetrics, scrapeComments as scrapeLinkedinComments } from "../platforms/linkedin/monitor.js";
+import { scrapePostMetrics as scrapeYoutubeMetrics, scrapeComments as scrapeYoutubeComments } from "../platforms/youtube/monitor.js";
 import { instagramConfig } from "../platforms/instagram/config.js";
 import { twitterConfig } from "../platforms/twitter/config.js";
 import { facebookConfig } from "../platforms/facebook/config.js";
 import { tiktokConfig } from "../platforms/tiktok/config.js";
 import { linkedinConfig } from "../platforms/linkedin/config.js";
 import { youtubeConfig } from "../platforms/youtube/config.js";
-import type { MonitorParams, MonitorResult, Platform, PostMetrics } from "./types.js";
+import type { MonitorParams, MonitorResult, Platform, PostMetrics, ScrapedComment } from "./types.js";
 
 const BASE_URL: Record<Platform, string> = {
   instagram: instagramConfig.baseUrl,
@@ -32,12 +32,25 @@ const SCRAPE_METRICS: Record<Platform, typeof scrapeInstagramMetrics> = {
   youtube: scrapeYoutubeMetrics,
 };
 
+const SCRAPE_COMMENTS: Record<Platform, typeof scrapeInstagramComments> = {
+  instagram: scrapeInstagramComments,
+  twitter: scrapeTwitterComments,
+  facebook: scrapeFacebookComments,
+  tiktok: scrapeTiktokComments,
+  linkedin: scrapeLinkedinComments,
+  youtube: scrapeYoutubeComments,
+};
+
 function baseUrlFor(platform: Platform): string {
   return BASE_URL[platform];
 }
 
 async function scrapeFor(platform: Platform, page: Parameters<typeof scrapeInstagramMetrics>[0], url: string): Promise<PostMetrics> {
   return SCRAPE_METRICS[platform](page, url);
+}
+
+async function scrapeCommentsFor(platform: Platform, page: Parameters<typeof scrapeInstagramComments>[0], url: string): Promise<ScrapedComment[]> {
+  return SCRAPE_COMMENTS[platform](page, url);
 }
 
 export async function runMonitorScrape(params: MonitorParams): Promise<MonitorResult> {
@@ -57,7 +70,11 @@ export async function runMonitorScrape(params: MonitorParams): Promise<MonitorRe
     }
 
     const metrics = await scrapeFor(params.platform, page, params.url);
-    return { status: "success", metrics, message: "scraped" };
+    if (!params.includeComments) {
+      return { status: "success", metrics, message: "scraped" };
+    }
+    const comments = await scrapeCommentsFor(params.platform, page, params.url).catch(() => []);
+    return { status: "success", metrics, message: "scraped", comments };
   } catch (err) {
     return { status: "error", metrics: {}, message: err instanceof Error ? err.message : String(err) };
   } finally {

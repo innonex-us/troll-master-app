@@ -100,6 +100,9 @@ pub fn spawn(app_handle: AppHandle, state: Arc<AppState>) {
             tick_standalone_rules(&app_handle, &state, tick_interval_secs).await;
             tick_campaigns(&app_handle, &state, tick_interval_secs).await;
             tick_monitoring(&state).await;
+            tick_comment_replies(&app_handle, &state, tick_interval_secs).await;
+            tick_dm_sequences(&app_handle, &state, tick_interval_secs).await;
+            tick_pods(&app_handle, &state, tick_interval_secs).await;
         }
     });
 }
@@ -427,6 +430,426 @@ async fn tick_monitoring(state: &Arc<AppState>) {
                 let _ = db::insert_snapshot(&conn, &post.id, &metrics);
             }
             Err(e) => eprintln!("[scheduler] monitor scrape failed for {}: {e}", post.url),
+        }
+    }
+}
+
+/// Watches monitored posts flagged for auto-reply, re-scrapes their comments on the
+/// same cadence as `tick_monitoring`, and replies to newly-seen comments — respecting
+/// the reply rule's own daily limit/delay/backoff and the acting profile's blacklist,
+/// exactly like a standalone action rule.
+async fn tick_comment_replies(app_handle: &AppHandle, state: &Arc<AppState>, tick_interval_secs: u64) {
+    let rules = {
+        let conn = state.db.0.lock().unwrap();
+        match db::list_enabled_reply_rules_with_posts(&conn) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("[scheduler] failed to list comment-reply rules: {e}");
+                return;
+            }
+        }
+    };
+
+    for (rule, post) in rules {
+        if still_in_backoff(&rule.backoff_until) {
+            continue;
+        }
+
+        let owner = {
+            let conn = state.db.0.lock().unwrap();
+            match db::get_profile(&conn, &post.viewer_profile_id) {
+                Ok(Some(p)) if p.status == "active" => p,
+                _ => continue,
+            }
+        };
+
+        let due = {
+            let conn = state.db.0.lock().unwrap();
+            let refresh_secs = db::get_settings(&conn).monitor_refresh_mins.max(1) * 60;
+            match &rule.last_checked_at {
+                Some(last) => match chrono::DateTime::parse_from_rfc3339(last) {
+                    Ok(t) => (Utc::now() - t.with_timezone(&Utc)).num_seconds() >= refresh_secs,
+                    Err(_) => true,
+                },
+                None => true,
+            }
+        };
+
+        if due {
+            match executor::scrape_post_comments(state, &owner, &post.url).await {
+                Ok(comments) => {
+                    let conn = state.db.0.lock().unwrap();
+                    for c in comments {
+                        let _ = db::upsert_comment(&conn, &post.id, &c.id, &c.author, &c.text);
+                    }
+                    let _ = db::set_reply_rule_last_checked(&conn, &rule.id);
+                }
+                Err(e) => eprintln!("[scheduler] comment scrape failed for {}: {e}", post.url),
+            }
+        }
+
+        let (count_today, last_at) = {
+            let conn = state.db.0.lock().unwrap();
+            let count = db::count_today(&conn, &owner.id, "reply_comment").unwrap_or(0);
+            let last = db::last_executed_at(&conn, &owner.id, "reply_comment").unwrap_or(None);
+            (count, last)
+        };
+
+        if count_today >= rule.daily_limit.max(1) {
+            continue;
+        }
+        if !delay_gate_passes(&last_at, rule.min_delay_sec, rule.max_delay_sec, tick_interval_secs) {
+            continue;
+        }
+
+        let comment = {
+            let conn = state.db.0.lock().unwrap();
+            match db::list_unreplied_comments(&conn, &post.id, 1) {
+                Ok(mut v) if !v.is_empty() => v.remove(0),
+                _ => continue,
+            }
+        };
+
+        let blacklisted = {
+            let conn = state.db.0.lock().unwrap();
+            db::is_blacklisted(&conn, &owner.id, &comment.author).unwrap_or(false)
+        };
+
+        let target = format!("{}#c:{}", post.url, comment.platform_comment_id);
+
+        let outcome = if blacklisted {
+            executor::ActionOutcome {
+                status: "skipped".to_string(),
+                message: format!("commenter {} is blacklisted", comment.author),
+            }
+        } else {
+            executor::run_action(state, &owner, "reply_comment", &target, &rule.reply_pool, "", "like").await
+        };
+
+        {
+            let conn = state.db.0.lock().unwrap();
+            let _ = db::insert_log(&conn, &owner.id, "reply_comment", &target, &outcome.status, Some(&outcome.message));
+            let _ = db::mark_comment_replied(&conn, &comment.id);
+
+            match outcome.status.as_str() {
+                "success" | "skipped" => {
+                    let _ = db::record_reply_rule_success(&conn, &rule.id);
+                }
+                "error" => {
+                    let backoff_until = next_backoff_until(&conn, rule.consecutive_errors);
+                    let _ = db::record_reply_rule_error(&conn, &rule.id, &backoff_until);
+                }
+                "challenged" | "banned" => {
+                    let _ = db::set_profile_status(&conn, &owner.id, &outcome.status);
+                }
+                _ => {}
+            }
+        }
+
+        let _ = app_handle.emit(
+            "action-log",
+            serde_json::json!({
+                "profileId": owner.id, "actionType": "reply_comment", "target": target,
+                "status": outcome.status, "message": outcome.message,
+            }),
+        );
+    }
+}
+
+/// Drives multi-step DM sequences: enrolls every current target of a
+/// `dm_sequence` rule at step 0, then — gated by the rule's own daily
+/// limit/delay window exactly like a standalone rule — sends whichever
+/// enrolled target's next step is due, advancing it or marking it complete.
+/// The sidecar has no notion of "sequence" at all; each step is sent as a
+/// plain `"dm"` action, so this reuses `executor::run_action` verbatim.
+async fn tick_dm_sequences(app_handle: &AppHandle, state: &Arc<AppState>, tick_interval_secs: u64) {
+    let rules = {
+        let conn = state.db.0.lock().unwrap();
+        match db::list_enabled_rules_by_action_type(&conn, "dm_sequence") {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("[scheduler] failed to list dm_sequence rules: {e}");
+                return;
+            }
+        }
+    };
+
+    for mut rule in rules {
+        if still_in_backoff(&rule.backoff_until) {
+            continue;
+        }
+        if rule.sequence_steps.is_empty() {
+            continue;
+        }
+
+        let profile = {
+            let conn = state.db.0.lock().unwrap();
+            match db::get_profile(&conn, &rule.profile_id) {
+                Ok(Some(p)) => p,
+                _ => continue,
+            }
+        };
+        if profile.status != "active" {
+            continue;
+        }
+
+        let rule_id = rule.id.clone();
+        refill_targets_if_low(
+            state,
+            &profile,
+            &rule.profile_id,
+            &rule.source_type,
+            &rule.source_seed,
+            rule.filter_skip_no_avatar,
+            &mut rule.target_source,
+            |conn, new_targets| db::append_targets(conn, &rule_id, new_targets),
+        )
+        .await;
+
+        if rule.target_source.is_empty() {
+            continue;
+        }
+
+        {
+            let conn = state.db.0.lock().unwrap();
+            for target in &rule.target_source {
+                let _ = db::enroll_target_if_new(&conn, &rule.id, target);
+            }
+        }
+
+        let (count_today, last_at) = {
+            let conn = state.db.0.lock().unwrap();
+            let count = db::count_today(&conn, &profile.id, "dm_sequence").unwrap_or(0);
+            let last = db::last_executed_at(&conn, &profile.id, "dm_sequence").unwrap_or(None);
+            (count, last)
+        };
+
+        if count_today >= rule.daily_limit.max(1) {
+            continue;
+        }
+        if !delay_gate_passes(&last_at, rule.min_delay_sec, rule.max_delay_sec, tick_interval_secs) {
+            continue;
+        }
+
+        let progress = {
+            let conn = state.db.0.lock().unwrap();
+            match db::next_due(&conn, &rule.id) {
+                Ok(Some(p)) => p,
+                _ => continue,
+            }
+        };
+
+        let Some(step) = rule.sequence_steps.get(progress.current_step as usize) else {
+            let conn = state.db.0.lock().unwrap();
+            let _ = db::complete(&conn, &progress.id);
+            continue;
+        };
+
+        let blacklisted = {
+            let conn = state.db.0.lock().unwrap();
+            db::is_blacklisted(&conn, &profile.id, &progress.target).unwrap_or(false)
+        };
+
+        let outcome = if blacklisted {
+            executor::ActionOutcome {
+                status: "skipped".to_string(),
+                message: "target is blacklisted".to_string(),
+            }
+        } else {
+            executor::run_action(state, &profile, "dm", &progress.target, &[], &step.message, "like").await
+        };
+
+        {
+            let conn = state.db.0.lock().unwrap();
+            let _ = db::insert_log(&conn, &profile.id, "dm_sequence", &progress.target, &outcome.status, Some(&outcome.message));
+
+            match outcome.status.as_str() {
+                "success" | "skipped" => {
+                    let next_idx = progress.current_step + 1;
+                    match rule.sequence_steps.get(next_idx as usize) {
+                        Some(next_step) => {
+                            let next_send_at = (Utc::now()
+                                + chrono::Duration::seconds((next_step.delay_hours * 3600.0) as i64))
+                            .to_rfc3339();
+                            let _ = db::advance_step(&conn, &progress.id, next_idx, &next_send_at);
+                        }
+                        None => {
+                            let _ = db::complete(&conn, &progress.id);
+                        }
+                    }
+                    let _ = db::record_rule_success(&conn, &rule.id);
+                }
+                "error" => {
+                    let backoff_until = next_backoff_until(&conn, rule.consecutive_errors);
+                    let _ = db::record_rule_error(&conn, &rule.id, &backoff_until);
+                }
+                "challenged" | "banned" => {
+                    let _ = db::set_profile_status(&conn, &profile.id, &outcome.status);
+                }
+                _ => {}
+            }
+        }
+
+        let _ = app_handle.emit(
+            "action-log",
+            serde_json::json!({
+                "profileId": profile.id, "actionType": "dm_sequence", "target": progress.target,
+                "status": outcome.status, "message": outcome.message,
+            }),
+        );
+    }
+}
+
+/// Drives Engagement Pods: for each pod, auto-detects each enabled member's
+/// newest own post (no manual per-post registration, unlike Monitor), then has
+/// every *other* enabled member like/comment on it — gated by the pod's own
+/// daily-limit-per-member/delay window and each acting profile's blacklist,
+/// reusing the plain `"like"`/`"comment"` sidecar actions verbatim. Logged
+/// under synthetic `"pod_like"`/`"pod_comment"` action types so pod activity
+/// never counts against a profile's own standalone like/comment rules.
+async fn tick_pods(app_handle: &AppHandle, state: &Arc<AppState>, tick_interval_secs: u64) {
+    let pods = {
+        let conn = state.db.0.lock().unwrap();
+        match db::list_enabled_pods(&conn) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("[scheduler] failed to list pods: {e}");
+                return;
+            }
+        }
+    };
+
+    for pod in pods {
+        let members = {
+            let conn = state.db.0.lock().unwrap();
+            match db::list_enabled_members_for_pod(&conn, &pod.id) {
+                Ok(m) => m,
+                Err(e) => {
+                    eprintln!("[scheduler] failed to list members for pod {}: {e}", pod.id);
+                    continue;
+                }
+            }
+        };
+        if members.len() < 2 {
+            continue;
+        }
+
+        let mut member_profiles: Vec<db::Profile> = Vec::new();
+        for m in &members {
+            let due = {
+                let conn = state.db.0.lock().unwrap();
+                let refresh_secs = db::get_settings(&conn).monitor_refresh_mins.max(1) * 60;
+                match &m.last_checked_at {
+                    Some(last) => match chrono::DateTime::parse_from_rfc3339(last) {
+                        Ok(t) => (Utc::now() - t.with_timezone(&Utc)).num_seconds() >= refresh_secs,
+                        Err(_) => true,
+                    },
+                    None => true,
+                }
+            };
+
+            let profile = {
+                let conn = state.db.0.lock().unwrap();
+                match db::get_profile(&conn, &m.profile_id) {
+                    Ok(Some(p)) if p.status == "active" => p,
+                    _ => continue,
+                }
+            };
+
+            if due {
+                match executor::fetch_latest_own_post(state, &profile).await {
+                    Ok(Some(url)) => {
+                        let conn = state.db.0.lock().unwrap();
+                        let _ = db::insert_pod_post_if_new(&conn, &pod.id, &profile.id, &url, pod.window_hours);
+                        let _ = db::set_member_last_checked(&conn, &m.id);
+                    }
+                    Ok(None) => {
+                        let conn = state.db.0.lock().unwrap();
+                        let _ = db::set_member_last_checked(&conn, &m.id);
+                    }
+                    Err(e) => eprintln!("[scheduler] own-post scrape failed for {}: {e}", profile.display_name),
+                }
+            }
+
+            member_profiles.push(profile);
+        }
+
+        let active_posts = {
+            let conn = state.db.0.lock().unwrap();
+            db::list_active_pod_posts(&conn, &pod.id).unwrap_or_default()
+        };
+
+        for post in &active_posts {
+            for actor in &member_profiles {
+                if actor.id == post.member_profile_id {
+                    continue;
+                }
+
+                for action in &pod.actions {
+                    let log_action_type = format!("pod_{action}");
+
+                    let already_done = {
+                        let conn = state.db.0.lock().unwrap();
+                        db::engagement_exists(&conn, &post.id, &actor.id, &log_action_type).unwrap_or(false)
+                    };
+                    if already_done {
+                        continue;
+                    }
+
+                    let (engagements_today, last_at) = {
+                        let conn = state.db.0.lock().unwrap();
+                        let count = db::count_pod_engagements_today(&conn, &pod.id, &actor.id).unwrap_or(0);
+                        let last = db::last_executed_at(&conn, &actor.id, &log_action_type).unwrap_or(None);
+                        (count, last)
+                    };
+                    if engagements_today >= pod.daily_limit_per_member.max(1) {
+                        continue;
+                    }
+                    if !delay_gate_passes(&last_at, pod.min_delay_sec, pod.max_delay_sec, tick_interval_secs) {
+                        continue;
+                    }
+
+                    let poster_username = {
+                        let conn = state.db.0.lock().unwrap();
+                        db::get_profile(&conn, &post.member_profile_id)
+                            .ok()
+                            .flatten()
+                            .map(|p| p.username)
+                            .unwrap_or_default()
+                    };
+                    let blacklisted = {
+                        let conn = state.db.0.lock().unwrap();
+                        db::is_blacklisted(&conn, &actor.id, &poster_username).unwrap_or(false)
+                    };
+
+                    let outcome = if blacklisted {
+                        executor::ActionOutcome {
+                            status: "skipped".to_string(),
+                            message: format!("{poster_username} is blacklisted"),
+                        }
+                    } else {
+                        executor::run_action(state, actor, action, &post.post_url, &pod.comment_pool, "", "like").await
+                    };
+
+                    {
+                        let conn = state.db.0.lock().unwrap();
+                        let _ = db::insert_log(&conn, &actor.id, &log_action_type, &post.post_url, &outcome.status, Some(&outcome.message));
+                        let _ = db::record_engagement(&conn, &post.id, &actor.id, &log_action_type, &outcome.status);
+
+                        if outcome.status == "challenged" || outcome.status == "banned" {
+                            let _ = db::set_profile_status(&conn, &actor.id, &outcome.status);
+                        }
+                    }
+
+                    let _ = app_handle.emit(
+                        "action-log",
+                        serde_json::json!({
+                            "profileId": actor.id, "actionType": log_action_type, "target": post.post_url,
+                            "status": outcome.status, "message": outcome.message,
+                        }),
+                    );
+                }
+            }
         }
     }
 }

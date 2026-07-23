@@ -2,6 +2,14 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct DmSequenceStep {
+    pub order: i64,
+    pub delay_hours: f64,
+    /// spintax message template for this step
+    pub message: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ActionRule {
     pub id: String,
     pub profile_id: String,
@@ -24,6 +32,8 @@ pub struct ActionRule {
     pub filter_skip_no_avatar: bool,
     /// "like" | "emoji" | "comment" — only meaningful when action_type is "react_story"
     pub reaction_type: String,
+    /// ordered steps used by the "dm_sequence" action; empty for every other action_type
+    pub sequence_steps: Vec<DmSequenceStep>,
     pub created_at: String,
 }
 
@@ -47,6 +57,8 @@ pub struct NewActionRule {
     pub filter_skip_no_avatar: bool,
     #[serde(default = "default_reaction_type")]
     pub reaction_type: String,
+    #[serde(default)]
+    pub sequence_steps: Vec<DmSequenceStep>,
 }
 
 fn default_source_type() -> String {
@@ -60,6 +72,7 @@ fn default_reaction_type() -> String {
 fn row_to_rule(row: &rusqlite::Row) -> rusqlite::Result<ActionRule> {
     let target_source: String = row.get("target_source")?;
     let comment_pool: String = row.get("comment_pool")?;
+    let sequence_steps: String = row.get("sequence_steps")?;
     Ok(ActionRule {
         id: row.get("id")?,
         profile_id: row.get("profile_id")?,
@@ -78,6 +91,7 @@ fn row_to_rule(row: &rusqlite::Row) -> rusqlite::Result<ActionRule> {
         dm_message: row.get("dm_message")?,
         filter_skip_no_avatar: row.get::<_, i64>("filter_skip_no_avatar")? != 0,
         reaction_type: row.get("reaction_type")?,
+        sequence_steps: serde_json::from_str(&sequence_steps).unwrap_or_default(),
         created_at: row.get("created_at")?,
     })
 }
@@ -87,9 +101,10 @@ pub fn insert_rule(conn: &Connection, new: &NewActionRule) -> rusqlite::Result<A
     let now = chrono::Utc::now().to_rfc3339();
     let target_source = serde_json::to_string(&new.target_source).unwrap();
     let comment_pool = serde_json::to_string(&new.comment_pool).unwrap();
+    let sequence_steps = serde_json::to_string(&new.sequence_steps).unwrap();
     conn.execute(
-        "INSERT INTO action_rules (id, profile_id, action_type, enabled, daily_limit, min_delay_sec, max_delay_sec, target_source, target_cursor, comment_pool, source_type, source_seed, consecutive_errors, backoff_until, dm_message, filter_skip_no_avatar, reaction_type, created_at)
-         VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10, 0, NULL, ?11, ?12, ?13, ?14)",
+        "INSERT INTO action_rules (id, profile_id, action_type, enabled, daily_limit, min_delay_sec, max_delay_sec, target_source, target_cursor, comment_pool, source_type, source_seed, consecutive_errors, backoff_until, dm_message, filter_skip_no_avatar, reaction_type, sequence_steps, created_at)
+         VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10, 0, NULL, ?11, ?12, ?13, ?14, ?15)",
         params![
             id,
             new.profile_id,
@@ -104,6 +119,7 @@ pub fn insert_rule(conn: &Connection, new: &NewActionRule) -> rusqlite::Result<A
             new.dm_message,
             new.filter_skip_no_avatar as i64,
             new.reaction_type,
+            sequence_steps,
             now,
         ],
     )?;
@@ -126,6 +142,12 @@ pub fn list_rules_for_profile(conn: &Connection, profile_id: &str) -> rusqlite::
 pub fn list_enabled_rules(conn: &Connection) -> rusqlite::Result<Vec<ActionRule>> {
     let mut stmt = conn.prepare("SELECT * FROM action_rules WHERE enabled = 1")?;
     let rows = stmt.query_map([], row_to_rule)?;
+    rows.collect()
+}
+
+pub fn list_enabled_rules_by_action_type(conn: &Connection, action_type: &str) -> rusqlite::Result<Vec<ActionRule>> {
+    let mut stmt = conn.prepare("SELECT * FROM action_rules WHERE enabled = 1 AND action_type = ?1")?;
+    let rows = stmt.query_map(params![action_type], row_to_rule)?;
     rows.collect()
 }
 

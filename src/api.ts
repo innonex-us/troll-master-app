@@ -11,8 +11,27 @@ export type ActionType =
   | "save"
   | "view_story"
   | "react_story"
+  | "reply_comment"
+  | "dm_sequence"
   | "retweet"
   | "unretweet";
+
+export type DmSequenceStep = {
+  order: number;
+  delay_hours: number;
+  message: string;
+};
+
+export type DmSequenceProgress = {
+  id: string;
+  rule_id: string;
+  target: string;
+  current_step: number;
+  status: string;
+  next_send_at: string;
+  started_at: string;
+  updated_at: string;
+};
 
 export type Profile = {
   id: string;
@@ -95,6 +114,7 @@ export type ActionRule = {
   dm_message: string;
   filter_skip_no_avatar: boolean;
   reaction_type: string;
+  sequence_steps: DmSequenceStep[];
   created_at: string;
 };
 
@@ -111,6 +131,7 @@ export type NewActionRule = {
   dm_message: string;
   filter_skip_no_avatar: boolean;
   reaction_type: string;
+  sequence_steps: DmSequenceStep[];
 };
 
 export type PostMetrics = {
@@ -141,6 +162,28 @@ export type MonitoredPostSnapshot = PostMetrics & {
   id: string;
   monitored_post_id: string;
   captured_at: string;
+};
+
+export type CommentReplyRule = {
+  id: string;
+  monitored_post_id: string;
+  enabled: boolean;
+  daily_limit: number;
+  min_delay_sec: number;
+  max_delay_sec: number;
+  reply_pool: string[];
+  consecutive_errors: number;
+  backoff_until: string | null;
+  last_checked_at: string | null;
+  created_at: string;
+};
+
+export type NewCommentReplyRule = {
+  monitored_post_id: string;
+  daily_limit: number;
+  min_delay_sec: number;
+  max_delay_sec: number;
+  reply_pool: string[];
 };
 
 export type AppSettings = {
@@ -232,6 +275,58 @@ export type ActionLogEntry = {
   executed_at: string;
 };
 
+export type Pod = {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  window_hours: number;
+  daily_limit_per_member: number;
+  min_delay_sec: number;
+  max_delay_sec: number;
+  actions: string[];
+  comment_pool: string[];
+  created_at: string;
+};
+
+export type NewPod = {
+  name: string;
+  description: string;
+  window_hours: number;
+  daily_limit_per_member: number;
+  min_delay_sec: number;
+  max_delay_sec: number;
+  actions: string[];
+  comment_pool: string[];
+};
+
+export type PodMember = {
+  id: string;
+  pod_id: string;
+  profile_id: string;
+  enabled: boolean;
+  last_checked_at: string | null;
+  created_at: string;
+};
+
+export type PodPost = {
+  id: string;
+  pod_id: string;
+  member_profile_id: string;
+  post_url: string;
+  detected_at: string;
+  expires_at: string;
+};
+
+export type PodEngagement = {
+  id: string;
+  pod_post_id: string;
+  acting_profile_id: string;
+  action_type: string;
+  status: string;
+  executed_at: string;
+};
+
 export const api = {
   listProfiles: () => invoke<Profile[]>("list_profiles_cmd"),
   createProfile: (newProfile: NewProfile) => invoke<Profile>("create_profile_cmd", { newProfile }),
@@ -259,6 +354,8 @@ export const api = {
     invoke<void>("set_rule_enabled_cmd", { id, enabled }),
   deleteRule: (id: string) => invoke<void>("delete_rule_cmd", { id }),
   refillRuleTargets: (ruleId: string) => invoke<number>("refill_rule_targets_cmd", { ruleId }),
+  listDmSequenceProgress: (ruleId: string) =>
+    invoke<DmSequenceProgress[]>("list_dm_sequence_progress_cmd", { ruleId }),
 
   listLogs: (limit: number) => invoke<ActionLogEntry[]>("list_logs_cmd", { limit }),
 
@@ -304,6 +401,27 @@ export const api = {
   listPostSnapshots: (monitoredPostId: string, limit: number) =>
     invoke<MonitoredPostSnapshot[]>("list_post_snapshots_cmd", { monitoredPostId, limit }),
   scrapePostNow: (monitoredPostId: string) => invoke<PostMetrics>("scrape_post_now_cmd", { monitoredPostId }),
+
+  getReplyRule: (monitoredPostId: string) =>
+    invoke<CommentReplyRule | null>("get_reply_rule_cmd", { monitoredPostId }),
+  upsertReplyRule: (newRule: NewCommentReplyRule) =>
+    invoke<CommentReplyRule>("upsert_reply_rule_cmd", { newRule }),
+  setReplyRuleEnabled: (id: string, enabled: boolean) =>
+    invoke<void>("set_reply_rule_enabled_cmd", { id, enabled }),
+  deleteReplyRule: (id: string) => invoke<void>("delete_reply_rule_cmd", { id }),
+
+  listPods: () => invoke<Pod[]>("list_pods_cmd"),
+  createPod: (newPod: NewPod) => invoke<Pod>("create_pod_cmd", { newPod }),
+  setPodEnabled: (id: string, enabled: boolean) => invoke<void>("set_pod_enabled_cmd", { id, enabled }),
+  deletePod: (id: string) => invoke<void>("delete_pod_cmd", { id }),
+  listPodMembers: (podId: string) => invoke<PodMember[]>("list_pod_members_cmd", { podId }),
+  addPodMember: (podId: string, profileId: string) =>
+    invoke<PodMember>("add_pod_member_cmd", { podId, profileId }),
+  removePodMember: (podId: string, profileId: string) =>
+    invoke<void>("remove_pod_member_cmd", { podId, profileId }),
+  listPodPosts: (podId: string, limit: number) => invoke<PodPost[]>("list_pod_posts_cmd", { podId, limit }),
+  listPodEngagements: (podPostId: string) =>
+    invoke<PodEngagement[]>("list_pod_engagements_cmd", { podPostId }),
 
   hasMasterPassword: () => invoke<boolean>("has_master_password_cmd"),
   setMasterPassword: (password: string) => invoke<void>("set_master_password_cmd", { password }),

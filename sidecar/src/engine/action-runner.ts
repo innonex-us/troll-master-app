@@ -25,6 +25,18 @@ function pickDmMessage(template?: string): string {
   return resolveSpintax(template && template.trim() ? template : "Hey {there|!} 👋");
 }
 
+/**
+ * `reply_comment` targets are composite strings `<postUrl>#c:<commentId>` so the
+ * Rust side can log/de-dupe per-comment while the sidecar only needs the post
+ * URL. Precisely threading a reply to one specific commenter is unreliable
+ * across these platforms' shifting DOMs, so this posts the reply as a new
+ * top-level comment on the same post via the platform's existing `comment()` —
+ * not threaded to the original commenter's reply chain.
+ */
+function postUrlFromReplyTarget(target: string): string {
+  return target.split("#c:")[0];
+}
+
 async function dispatchInstagram(page: Page, params: ActionRunParams): Promise<ActionResult> {
   switch (params.actionType) {
     case "follow":
@@ -45,6 +57,8 @@ async function dispatchInstagram(page: Page, params: ActionRunParams): Promise<A
       return instagram.reactStory(page, params.target, params.reactionType ?? "like", pickComment(params.commentPool));
     case "dm":
       return instagram.dm(page, params.target, pickDmMessage(params.dmMessage));
+    case "reply_comment":
+      return instagram.comment(page, postUrlFromReplyTarget(params.target), pickComment(params.commentPool));
     default:
       return { status: "error", message: `unsupported Instagram action: ${params.actionType}` };
   }
@@ -68,6 +82,8 @@ async function dispatchTwitter(page: Page, params: ActionRunParams): Promise<Act
       return twitter.unretweet(page, params.target);
     case "dm":
       return twitter.dm(page, params.target, pickDmMessage(params.dmMessage));
+    case "reply_comment":
+      return twitter.comment(page, postUrlFromReplyTarget(params.target), pickComment(params.commentPool));
     default:
       return { status: "error", message: `unsupported X/Twitter action: ${params.actionType}` };
   }
@@ -87,6 +103,8 @@ async function dispatchFacebook(page: Page, params: ActionRunParams): Promise<Ac
       return facebook.comment(page, params.target, pickComment(params.commentPool));
     case "dm":
       return facebook.dm(page, params.target, pickDmMessage(params.dmMessage));
+    case "reply_comment":
+      return facebook.comment(page, postUrlFromReplyTarget(params.target), pickComment(params.commentPool));
     default:
       return { status: "error", message: `unsupported Facebook action: ${params.actionType}` };
   }
@@ -130,6 +148,8 @@ async function dispatchTiktok(page: Page, params: ActionRunParams): Promise<Acti
       return tiktok.reactStory(page, params.target, params.reactionType ?? "like", pickComment(params.commentPool));
     case "dm":
       return tiktok.dm(page, params.target, pickDmMessage(params.dmMessage));
+    case "reply_comment":
+      return tiktok.comment(page, postUrlFromReplyTarget(params.target), pickComment(params.commentPool));
     default:
       return { status: "error", message: `unsupported TikTok action: ${params.actionType}` };
   }
@@ -149,6 +169,8 @@ async function dispatchLinkedin(page: Page, params: ActionRunParams): Promise<Ac
       return linkedin.comment(page, params.target, pickComment(params.commentPool));
     case "dm":
       return linkedin.dm(page, params.target, pickDmMessage(params.dmMessage));
+    case "reply_comment":
+      return linkedin.comment(page, postUrlFromReplyTarget(params.target), pickComment(params.commentPool));
     default:
       return { status: "error", message: `unsupported LinkedIn action: ${params.actionType}` };
   }
@@ -172,6 +194,8 @@ async function dispatchYoutube(page: Page, params: ActionRunParams): Promise<Act
       return youtube.reactStory(page, params.target, params.reactionType ?? "like", pickComment(params.commentPool));
     case "dm":
       return youtube.dm(page, params.target, pickDmMessage(params.dmMessage));
+    case "reply_comment":
+      return youtube.comment(page, postUrlFromReplyTarget(params.target), pickComment(params.commentPool));
     default:
       return { status: "error", message: `unsupported YouTube action: ${params.actionType}` };
   }
