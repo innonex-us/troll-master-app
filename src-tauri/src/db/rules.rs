@@ -37,7 +37,7 @@ pub struct ActionRule {
     pub created_at: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct NewActionRule {
     pub profile_id: String,
     pub action_type: String,
@@ -136,6 +136,12 @@ pub fn get_rule(conn: &Connection, id: &str) -> rusqlite::Result<Option<ActionRu
 pub fn list_rules_for_profile(conn: &Connection, profile_id: &str) -> rusqlite::Result<Vec<ActionRule>> {
     let mut stmt = conn.prepare("SELECT * FROM action_rules WHERE profile_id = ?1 ORDER BY created_at DESC")?;
     let rows = stmt.query_map(params![profile_id], row_to_rule)?;
+    rows.collect()
+}
+
+pub fn list_all_rules(conn: &Connection) -> rusqlite::Result<Vec<ActionRule>> {
+    let mut stmt = conn.prepare("SELECT * FROM action_rules ORDER BY created_at ASC")?;
+    let rows = stmt.query_map([], row_to_rule)?;
     rows.collect()
 }
 

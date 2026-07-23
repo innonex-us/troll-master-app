@@ -1,19 +1,25 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, Platform, Profile, ProfileGroup, Proxy } from "../api";
+import { api, Campaign, Platform, Pod, Profile, ProfileGroup, Proxy } from "../api";
 import { RulesPanel } from "./RulesPanel";
 import { ProfileManagePanel } from "./ProfileManagePanel";
 import { Badge } from "../components/Badge";
 import { Modal } from "../components/Modal";
+import { BulkToolbar } from "../components/BulkToolbar";
+import { BulkRuleModal } from "../components/BulkRuleModal";
 
 export function ProfilesPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [proxies, setProxies] = useState<Proxy[]>([]);
   const [groups, setGroups] = useState<ProfileGroup[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [pods, setPods] = useState<Pod[]>([]);
   const [error, setError] = useState("");
   const [rulesModal, setRulesModal] = useState<Profile | null>(null);
   const [manageModal, setManageModal] = useState<Profile | null>(null);
   const [showAddProfile, setShowAddProfile] = useState(false);
+  const [showBulkRule, setShowBulkRule] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<Record<string, string>>({});
+  const [bulkStatus, setBulkStatus] = useState("");
 
   const [platform, setPlatform] = useState<Platform>("instagram");
   const [displayName, setDisplayName] = useState("");
@@ -25,16 +31,26 @@ export function ProfilesPage() {
   const [newGroupName, setNewGroupName] = useState("");
   const [groupFilter, setGroupFilter] = useState("");
 
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkGroupId, setBulkGroupId] = useState("");
+  const [bulkProxyId, setBulkProxyId] = useState("");
+  const [bulkCampaignId, setBulkCampaignId] = useState("");
+  const [bulkPodId, setBulkPodId] = useState("");
+
   async function refresh() {
     try {
-      const [p, px, g] = await Promise.all([
+      const [p, px, g, c, pd] = await Promise.all([
         api.listProfiles(),
         api.listProxies(),
         api.listProfileGroups(),
+        api.listCampaigns(),
+        api.listPods(),
       ]);
       setProfiles(p);
       setProxies(px);
       setGroups(g);
+      setCampaigns(c);
+      setPods(pd);
       setError("");
     } catch (err) {
       setError(String(err));
@@ -120,7 +136,68 @@ export function ProfilesPage() {
     await refresh();
   }
 
+  async function duplicateProfile(id: string) {
+    try {
+      await api.duplicateProfile(id);
+      await refresh();
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
   const visibleProfiles = groupFilter ? profiles.filter((p) => p.group_id === groupFilter) : profiles;
+  const selectedProfiles = profiles.filter((p) => selected.has(p.id));
+
+  function toggleSelected(id: string) {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((s) =>
+      s.size === visibleProfiles.length ? new Set() : new Set(visibleProfiles.map((p) => p.id)),
+    );
+  }
+
+  async function bulkSetEnabled(enabled: boolean) {
+    await Promise.all(Array.from(selected).map((id) => api.setProfileEnabled(id, enabled)));
+    setSelected(new Set());
+    await refresh();
+  }
+
+  async function bulkDelete() {
+    await Promise.all(Array.from(selected).map((id) => api.deleteProfile(id)));
+    setSelected(new Set());
+    await refresh();
+  }
+
+  async function bulkAssignGroup() {
+    await Promise.all(Array.from(selected).map((id) => api.setProfileGroup(id, bulkGroupId || null)));
+    await refresh();
+  }
+
+  async function bulkAssignProxy() {
+    await Promise.all(Array.from(selected).map((id) => api.setProfileProxy(id, bulkProxyId || null)));
+    await refresh();
+  }
+
+  async function bulkAddToCampaign() {
+    if (!bulkCampaignId) return;
+    const result = await api.enrollProfiles(bulkCampaignId, Array.from(selected));
+    setBulkStatus(
+      result.skipped.length > 0 ? `Enrolled ${result.enrolled}; skipped: ${result.skipped.join("; ")}` : `Enrolled ${result.enrolled}`,
+    );
+  }
+
+  async function bulkAddToPod() {
+    if (!bulkPodId) return;
+    await Promise.all(Array.from(selected).map((id) => api.addPodMember(bulkPodId, id)));
+    setBulkStatus(`Added ${selected.size} profile(s) to pod`);
+  }
 
   return (
     <div>
@@ -170,10 +247,79 @@ export function ProfilesPage() {
         )}
       </div>
 
+      {selected.size > 0 && (
+        <BulkToolbar count={selected.size}>
+          <button type="button" onClick={() => bulkSetEnabled(true)}>
+            Enable
+          </button>
+          <button type="button" onClick={() => bulkSetEnabled(false)}>
+            Disable
+          </button>
+          <select value={bulkGroupId} onChange={(e) => setBulkGroupId(e.target.value)}>
+            <option value="">No group</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" onClick={bulkAssignGroup}>
+            Assign Group
+          </button>
+          <select value={bulkProxyId} onChange={(e) => setBulkProxyId(e.target.value)}>
+            <option value="">No proxy</option>
+            {proxies.map((px) => (
+              <option key={px.id} value={px.id}>
+                {px.label}
+              </option>
+            ))}
+          </select>
+          <button type="button" onClick={bulkAssignProxy}>
+            Assign Proxy
+          </button>
+          <select value={bulkCampaignId} onChange={(e) => setBulkCampaignId(e.target.value)}>
+            <option value="">Choose campaign…</option>
+            {campaigns.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" onClick={bulkAddToCampaign}>
+            Add to Campaign
+          </button>
+          <select value={bulkPodId} onChange={(e) => setBulkPodId(e.target.value)}>
+            <option value="">Choose pod…</option>
+            {pods.map((pd) => (
+              <option key={pd.id} value={pd.id}>
+                {pd.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" onClick={bulkAddToPod}>
+            Add to Pod
+          </button>
+          <button type="button" onClick={() => setShowBulkRule(true)}>
+            Create Rule for Selected
+          </button>
+          <button type="button" className="danger" onClick={bulkDelete}>
+            Delete
+          </button>
+        </BulkToolbar>
+      )}
+      {bulkStatus && <p className="hint">{bulkStatus}</p>}
+
       <div className="panel">
       <table className="mini-table">
         <thead>
           <tr>
+            <th>
+              <input
+                type="checkbox"
+                checked={visibleProfiles.length > 0 && selected.size === visibleProfiles.length}
+                onChange={toggleSelectAll}
+              />
+            </th>
             <th>Name</th>
             <th>Username</th>
             <th>Platform</th>
@@ -188,11 +334,14 @@ export function ProfilesPage() {
         <tbody>
           {visibleProfiles.map((p) => (
             <tr key={p.id}>
+              <td>
+                <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelected(p.id)} />
+              </td>
               <td>{p.display_name}</td>
               <td>{p.username}</td>
               <td>{p.platform}</td>
               <td>
-                <Badge status={p.status} />
+                <Badge status={p.enabled ? p.status : "paused"} />
               </td>
               <td>
                 <div className="hint">{p.device_name || "unnamed"}</div>
@@ -231,6 +380,9 @@ export function ProfilesPage() {
                 <button type="button" onClick={() => setManageModal(p)}>
                   Manage
                 </button>
+                <button type="button" onClick={() => duplicateProfile(p.id)}>
+                  Duplicate
+                </button>
                 <button type="button" className="danger" onClick={() => removeProfile(p.id)}>
                   Delete
                 </button>
@@ -239,7 +391,7 @@ export function ProfilesPage() {
           ))}
           {visibleProfiles.length === 0 && (
             <tr>
-              <td className="empty" colSpan={9}>
+              <td className="empty" colSpan={10}>
                 No profiles yet — add one to get started.
               </td>
             </tr>
@@ -309,6 +461,16 @@ export function ProfilesPage() {
         <Modal title={`Manage — ${manageModal.display_name}`} onClose={() => setManageModal(null)} wide>
           <ProfileManagePanel profile={manageModal} onChanged={refresh} />
         </Modal>
+      )}
+
+      {showBulkRule && (
+        <BulkRuleModal
+          profiles={selectedProfiles}
+          onClose={() => setShowBulkRule(false)}
+          onDone={() => {
+            setSelected(new Set());
+          }}
+        />
       )}
     </div>
   );

@@ -9,7 +9,7 @@ pub struct ProfileGroup {
     pub created_at: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct NewProfileGroup {
     pub name: String,
     #[serde(default)]

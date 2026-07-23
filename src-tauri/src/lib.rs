@@ -1,4 +1,5 @@
 mod auth;
+mod backup;
 mod commands;
 mod crypto;
 mod db;
@@ -43,6 +44,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir().expect("resolve app data dir");
             std::fs::create_dir_all(&app_data_dir).expect("create app data dir");
@@ -76,6 +78,8 @@ pub fn run() {
             commands::list_profiles_cmd,
             commands::create_profile_cmd,
             commands::delete_profile_cmd,
+            commands::set_profile_enabled_cmd,
+            commands::duplicate_profile_cmd,
             commands::set_profile_proxy_cmd,
             commands::capture_login_cmd,
             commands::list_proxies_cmd,
@@ -122,6 +126,8 @@ pub fn run() {
             commands::clear_profile_password_cmd,
             commands::auto_login_cmd,
             commands::import_cookies_cmd,
+            commands::export_backup_cmd,
+            commands::import_backup_cmd,
             commands::get_reply_rule_cmd,
             commands::upsert_reply_rule_cmd,
             commands::set_reply_rule_enabled_cmd,

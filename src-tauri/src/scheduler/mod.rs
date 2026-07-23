@@ -171,7 +171,7 @@ async fn tick_standalone_rules(app_handle: &AppHandle, state: &Arc<AppState>, ti
                 _ => continue,
             }
         };
-        if profile.status != "active" {
+        if profile.status != "active" || !profile.enabled {
             continue;
         }
 
@@ -289,7 +289,7 @@ async fn tick_campaigns(app_handle: &AppHandle, state: &Arc<AppState>, tick_inte
                 _ => continue,
             }
         };
-        if profile.status != "active" {
+        if profile.status != "active" || !profile.enabled {
             continue;
         }
 
@@ -419,7 +419,7 @@ async fn tick_monitoring(state: &Arc<AppState>) {
         let viewer = {
             let conn = state.db.0.lock().unwrap();
             match db::get_profile(&conn, &post.viewer_profile_id) {
-                Ok(Some(p)) if p.status == "active" => p,
+                Ok(Some(p)) if p.status == "active" && p.enabled => p,
                 _ => continue,
             }
         };
@@ -458,7 +458,7 @@ async fn tick_comment_replies(app_handle: &AppHandle, state: &Arc<AppState>, tic
         let owner = {
             let conn = state.db.0.lock().unwrap();
             match db::get_profile(&conn, &post.viewer_profile_id) {
-                Ok(Some(p)) if p.status == "active" => p,
+                Ok(Some(p)) if p.status == "active" && p.enabled => p,
                 _ => continue,
             }
         };
@@ -589,7 +589,7 @@ async fn tick_dm_sequences(app_handle: &AppHandle, state: &Arc<AppState>, tick_i
                 _ => continue,
             }
         };
-        if profile.status != "active" {
+        if profile.status != "active" || !profile.enabled {
             continue;
         }
 
@@ -751,7 +751,7 @@ async fn tick_pods(app_handle: &AppHandle, state: &Arc<AppState>, tick_interval_
             let profile = {
                 let conn = state.db.0.lock().unwrap();
                 match db::get_profile(&conn, &m.profile_id) {
-                    Ok(Some(p)) if p.status == "active" => p,
+                    Ok(Some(p)) if p.status == "active" && p.enabled => p,
                     _ => continue,
                 }
             };

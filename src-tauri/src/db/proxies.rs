@@ -13,7 +13,7 @@ pub struct Proxy {
     pub created_at: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct NewProxy {
     pub label: String,
     pub protocol: String,

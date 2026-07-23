@@ -19,7 +19,7 @@ pub struct CampaignRule {
     pub created_at: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct NewCampaignRule {
     pub campaign_id: String,
     pub action_type: String,
@@ -101,6 +101,12 @@ pub fn insert_campaign_rule(conn: &Connection, new: &NewCampaignRule) -> rusqlit
         params![id],
         row_to_campaign_rule,
     )
+}
+
+pub fn list_all_campaign_rules(conn: &Connection) -> rusqlite::Result<Vec<CampaignRule>> {
+    let mut stmt = conn.prepare("SELECT * FROM campaign_rules ORDER BY created_at ASC")?;
+    let rows = stmt.query_map([], row_to_campaign_rule)?;
+    rows.collect()
 }
 
 pub fn list_campaign_rules(conn: &Connection, campaign_id: &str) -> rusqlite::Result<Vec<CampaignRule>> {

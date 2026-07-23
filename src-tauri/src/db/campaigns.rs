@@ -12,7 +12,7 @@ pub struct Campaign {
     pub updated_at: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct NewCampaign {
     pub name: String,
     #[serde(default)]

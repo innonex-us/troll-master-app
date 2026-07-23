@@ -324,6 +324,7 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     add_column_if_missing(conn, "action_rules", "reaction_type", "TEXT NOT NULL DEFAULT 'like'")?;
     add_column_if_missing(conn, "campaign_rules", "reaction_type", "TEXT NOT NULL DEFAULT 'like'")?;
     add_column_if_missing(conn, "action_rules", "sequence_steps", "TEXT NOT NULL DEFAULT '[]'")?;
+    add_column_if_missing(conn, "profiles", "enabled", "INTEGER NOT NULL DEFAULT 1")?;
     Ok(())
 }
 

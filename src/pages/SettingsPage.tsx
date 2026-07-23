@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { getVersion } from "@tauri-apps/api/app";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, AppSettings } from "../api";
 import { checkForUpdate, installUpdate, type Update } from "../update";
 
@@ -19,6 +20,9 @@ export function SettingsPage() {
   const [clearStatus, setClearStatus] = useState("");
 
   const [pingStatus, setPingStatus] = useState("");
+
+  const [backupStatus, setBackupStatus] = useState("");
+  const [includeSettingsOnImport, setIncludeSettingsOnImport] = useState(false);
 
   const [updateStatus, setUpdateStatus] = useState("");
   const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
@@ -86,6 +90,42 @@ export function SettingsPage() {
       setClearStatus(`removed ${count} log entries older than ${clearDays} days`);
     } catch (err) {
       setClearStatus(`error: ${err}`);
+    }
+  }
+
+  async function exportBackup() {
+    setBackupStatus("");
+    try {
+      const path = await save({
+        defaultPath: "jarveeauto-backup.json",
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path) return;
+      await api.exportBackup(path);
+      setBackupStatus(`exported to ${path}`);
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
+
+  async function importBackup() {
+    setBackupStatus("");
+    try {
+      const path = await open({
+        multiple: false,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path || Array.isArray(path)) return;
+      const summary = await api.importBackup(path, includeSettingsOnImport);
+      setBackupStatus(
+        `imported ${summary.proxies} proxies, ${summary.groups} groups, ${summary.profiles} profiles, ` +
+          `${summary.rules} rules, ${summary.campaigns} campaigns, ${summary.campaign_rules} campaign rules, ` +
+          `${summary.pods} pods, ${summary.pod_members} pod members, ${summary.blacklist} blacklist entries` +
+          (summary.settings_imported ? " — global settings replaced" : ""),
+      );
+      await refresh();
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
     }
   }
 
@@ -259,6 +299,37 @@ export function SettingsPage() {
           </button>
           {clearStatus && <span className="hint">{clearStatus}</span>}
         </div>
+      </div>
+
+      <div className="panel">
+        <h3>Backup</h3>
+        <p className="hint">
+          Export profiles, proxies, groups, rules, campaigns, pods, and blacklist to a JSON file —
+          everything is created as new records on import, never overwriting existing data. Session
+          logins and stored passwords are never included (they're tied to this machine's keychain);
+          restored profiles need a fresh login.
+        </p>
+        <div className="row">
+          <button type="button" className="primary" onClick={exportBackup}>
+            Export Backup
+          </button>
+        </div>
+        <div className="row">
+          <label className="hint">
+            <input
+              type="checkbox"
+              checked={includeSettingsOnImport}
+              onChange={(e) => setIncludeSettingsOnImport(e.target.checked)}
+            />{" "}
+            also replace global engine settings with the imported file's
+          </label>
+        </div>
+        <div className="row">
+          <button type="button" onClick={importBackup}>
+            Import Backup
+          </button>
+        </div>
+        {backupStatus && <p className="hint">{backupStatus}</p>}
       </div>
 
       <div className="panel">

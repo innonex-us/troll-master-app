@@ -18,7 +18,7 @@ pub struct Pod {
     pub created_at: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct NewPod {
     pub name: String,
     #[serde(default)]
@@ -143,6 +143,12 @@ pub fn remove_pod_member(conn: &Connection, pod_id: &str, profile_id: &str) -> r
         params![pod_id, profile_id],
     )?;
     Ok(())
+}
+
+pub fn list_all_pod_members(conn: &Connection) -> rusqlite::Result<Vec<PodMember>> {
+    let mut stmt = conn.prepare("SELECT * FROM pod_members ORDER BY created_at ASC")?;
+    let rows = stmt.query_map([], row_to_member)?;
+    rows.collect()
 }
 
 pub fn list_pod_members(conn: &Connection, pod_id: &str) -> rusqlite::Result<Vec<PodMember>> {

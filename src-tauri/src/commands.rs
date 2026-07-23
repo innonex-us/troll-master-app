@@ -3,7 +3,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::state::AppState;
-use crate::{auth, db, executor, fingerprint};
+use crate::{auth, backup, db, executor, fingerprint};
 
 #[tauri::command]
 pub async fn has_master_password_cmd(state: State<'_, Arc<AppState>>) -> Result<bool, String> {
@@ -46,6 +46,25 @@ pub async fn create_profile_cmd(
 pub async fn delete_profile_cmd(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
     let conn = state.db.0.lock().unwrap();
     db::delete_profile(&conn, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_profile_enabled_cmd(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::set_profile_enabled(&conn, &id, enabled).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn duplicate_profile_cmd(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<db::Profile, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::duplicate_profile(&conn, &id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -608,4 +627,26 @@ pub async fn import_cookies_cmd(
     cookies_json: String,
 ) -> Result<(), String> {
     executor::import_cookies(&state, &profile_id, &cookies_json).await
+}
+
+#[tauri::command]
+pub async fn export_backup_cmd(state: State<'_, Arc<AppState>>, path: String) -> Result<(), String> {
+    let bundle = {
+        let conn = state.db.0.lock().unwrap();
+        backup::export_bundle(&conn).map_err(|e| e.to_string())?
+    };
+    let json = serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_backup_cmd(
+    state: State<'_, Arc<AppState>>,
+    path: String,
+    include_settings: bool,
+) -> Result<backup::ImportSummary, String> {
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let bundle: backup::BackupBundle = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let mut conn = state.db.0.lock().unwrap();
+    backup::import_bundle(&mut conn, &bundle, include_settings).map_err(|e| e.to_string())
 }

@@ -49,6 +49,7 @@ export type Profile = {
   group_id: string | null;
   device_name: string;
   device_id: string;
+  enabled: boolean;
   has_password: boolean;
   created_at: string;
   updated_at: string;
@@ -254,6 +255,19 @@ export type EnrollResult = {
   skipped: string[];
 };
 
+export type ImportSummary = {
+  proxies: number;
+  groups: number;
+  profiles: number;
+  rules: number;
+  campaigns: number;
+  campaign_rules: number;
+  pods: number;
+  pod_members: number;
+  blacklist: number;
+  settings_imported: boolean;
+};
+
 export type CampaignRuleState = {
   id: string;
   campaign_rule_id: string;
@@ -333,6 +347,9 @@ export const api = {
   deleteProfile: (id: string) => invoke<void>("delete_profile_cmd", { id }),
   setProfileProxy: (id: string, proxyId: string | null) =>
     invoke<void>("set_profile_proxy_cmd", { id, proxyId }),
+  setProfileEnabled: (id: string, enabled: boolean) =>
+    invoke<void>("set_profile_enabled_cmd", { id, enabled }),
+  duplicateProfile: (id: string) => invoke<Profile>("duplicate_profile_cmd", { id }),
   captureLogin: (profileId: string) => invoke<void>("capture_login_cmd", { profileId }),
   setProfileDeviceName: (id: string, deviceName: string) =>
     invoke<void>("set_profile_device_name_cmd", { id, deviceName }),
@@ -432,4 +449,8 @@ export const api = {
   clearOldLogs: (days: number) => invoke<number>("clear_old_logs_cmd", { days }),
   getAppDataDir: () => invoke<string>("get_app_data_dir_cmd"),
   pingSidecar: () => invoke<{ pong: boolean; ts: number }>("ping_sidecar"),
+
+  exportBackup: (path: string) => invoke<void>("export_backup_cmd", { path }),
+  importBackup: (path: string, includeSettings: boolean) =>
+    invoke<ImportSummary>("import_backup_cmd", { path, includeSettings }),
 };
