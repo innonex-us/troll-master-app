@@ -421,3 +421,302 @@ pub fn import_bundle(
         settings_imported,
     })
 }
+
+// ---------- Per-section (scoped) export/import ----------
+//
+// Unlike `BackupBundle`, these cover just one management page's own data (plus
+// its direct dependents, e.g. rules for profiles). Ids for entities INSIDE the
+// exported scope are still freshly generated and remapped on import, exactly
+// like the full bundle. Cross-references to entities OUTSIDE the scope (e.g. a
+// profile's proxy_id when exporting only Profiles) are resolved by checking
+// whether that same id still exists in the current database — not remapped —
+// since those rows aren't being recreated by this import.
+
+#[derive(Serialize, Deserialize)]
+pub struct ProfilesBundle {
+    pub version: u32,
+    pub exported_at: String,
+    pub profiles: Vec<ProfileExport>,
+    pub rules: Vec<RuleExport>,
+}
+
+#[derive(Serialize)]
+pub struct ProfilesImportSummary {
+    pub profiles: usize,
+    pub rules: usize,
+}
+
+pub fn export_profiles_bundle(conn: &Connection) -> rusqlite::Result<ProfilesBundle> {
+    let full = export_bundle(conn)?;
+    Ok(ProfilesBundle {
+        version: 1,
+        exported_at: full.exported_at,
+        profiles: full.profiles,
+        rules: full.rules,
+    })
+}
+
+pub fn import_profiles_bundle(
+    conn: &mut Connection,
+    bundle: &ProfilesBundle,
+) -> rusqlite::Result<ProfilesImportSummary> {
+    let tx = conn.transaction()?;
+
+    let mut profile_ids: HashMap<String, String> = HashMap::new();
+    for p in &bundle.profiles {
+        let proxy_id = match &p.new.proxy_id {
+            Some(old) => db::get_proxy(&tx, old)?.map(|_| old.clone()),
+            None => None,
+        };
+        let group_id = match &p.old_group_id {
+            Some(old) => db::get_group(&tx, old)?.map(|_| old.clone()),
+            None => None,
+        };
+        let new = db::NewProfile {
+            platform: p.new.platform.clone(),
+            display_name: p.new.display_name.clone(),
+            username: p.new.username.clone(),
+            proxy_id,
+            device_name: p.new.device_name.clone(),
+        };
+        let fp = crate::fingerprint::Fingerprint {
+            user_agent: p.user_agent.clone(),
+            timezone: p.timezone.clone(),
+            locale: p.locale.clone(),
+            viewport_width: p.viewport_width,
+            viewport_height: p.viewport_height,
+        };
+        let created = db::insert_profile(&tx, &new, &fp)?;
+        if group_id.is_some() {
+            db::set_profile_group(&tx, &created.id, group_id.as_deref())?;
+        }
+        if !p.enabled {
+            db::set_profile_enabled(&tx, &created.id, false)?;
+        }
+        profile_ids.insert(p.old_id.clone(), created.id);
+    }
+
+    let mut rules_count = 0usize;
+    for r in &bundle.rules {
+        let Some(new_profile_id) = profile_ids.get(&r.old_profile_id) else { continue };
+        let new_rule = db::NewActionRule {
+            profile_id: new_profile_id.clone(),
+            action_type: r.new.action_type.clone(),
+            daily_limit: r.new.daily_limit,
+            min_delay_sec: r.new.min_delay_sec,
+            max_delay_sec: r.new.max_delay_sec,
+            target_source: r.new.target_source.clone(),
+            comment_pool: r.new.comment_pool.clone(),
+            source_type: r.new.source_type.clone(),
+            source_seed: r.new.source_seed.clone(),
+            dm_message: r.new.dm_message.clone(),
+            filter_skip_no_avatar: r.new.filter_skip_no_avatar,
+            reaction_type: r.new.reaction_type.clone(),
+            sequence_steps: r.new.sequence_steps.clone(),
+        };
+        let created = db::insert_rule(&tx, &new_rule)?;
+        if !r.enabled {
+            db::set_rule_enabled(&tx, &created.id, false)?;
+        }
+        rules_count += 1;
+    }
+
+    tx.commit()?;
+    Ok(ProfilesImportSummary {
+        profiles: profile_ids.len(),
+        rules: rules_count,
+    })
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CampaignsBundle {
+    pub version: u32,
+    pub exported_at: String,
+    pub campaigns: Vec<CampaignExport>,
+    pub campaign_rules: Vec<CampaignRuleExport>,
+}
+
+#[derive(Serialize)]
+pub struct CampaignsImportSummary {
+    pub campaigns: usize,
+    pub campaign_rules: usize,
+}
+
+pub fn export_campaigns_bundle(conn: &Connection) -> rusqlite::Result<CampaignsBundle> {
+    let full = export_bundle(conn)?;
+    Ok(CampaignsBundle {
+        version: 1,
+        exported_at: full.exported_at,
+        campaigns: full.campaigns,
+        campaign_rules: full.campaign_rules,
+    })
+}
+
+pub fn import_campaigns_bundle(
+    conn: &mut Connection,
+    bundle: &CampaignsBundle,
+) -> rusqlite::Result<CampaignsImportSummary> {
+    let tx = conn.transaction()?;
+
+    let mut campaign_ids: HashMap<String, String> = HashMap::new();
+    for c in &bundle.campaigns {
+        let created = db::insert_campaign(&tx, &c.new)?;
+        if !c.enabled {
+            db::set_campaign_enabled(&tx, &created.id, false)?;
+        }
+        campaign_ids.insert(c.old_id.clone(), created.id);
+    }
+
+    let mut campaign_rules_count = 0usize;
+    for cr in &bundle.campaign_rules {
+        let Some(new_campaign_id) = campaign_ids.get(&cr.old_campaign_id) else { continue };
+        let new_cr = db::NewCampaignRule {
+            campaign_id: new_campaign_id.clone(),
+            action_type: cr.new.action_type.clone(),
+            daily_limit: cr.new.daily_limit,
+            min_delay_sec: cr.new.min_delay_sec,
+            max_delay_sec: cr.new.max_delay_sec,
+            target_source: cr.new.target_source.clone(),
+            comment_pool: cr.new.comment_pool.clone(),
+            source_type: cr.new.source_type.clone(),
+            source_seed: cr.new.source_seed.clone(),
+            dm_message: cr.new.dm_message.clone(),
+            filter_skip_no_avatar: cr.new.filter_skip_no_avatar,
+            reaction_type: cr.new.reaction_type.clone(),
+        };
+        db::insert_campaign_rule(&tx, &new_cr)?;
+        campaign_rules_count += 1;
+    }
+
+    tx.commit()?;
+    Ok(CampaignsImportSummary {
+        campaigns: campaign_ids.len(),
+        campaign_rules: campaign_rules_count,
+    })
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PodsBundle {
+    pub version: u32,
+    pub exported_at: String,
+    pub pods: Vec<PodExport>,
+    pub pod_members: Vec<PodMemberExport>,
+}
+
+#[derive(Serialize)]
+pub struct PodsImportSummary {
+    pub pods: usize,
+    pub pod_members: usize,
+}
+
+pub fn export_pods_bundle(conn: &Connection) -> rusqlite::Result<PodsBundle> {
+    let full = export_bundle(conn)?;
+    Ok(PodsBundle {
+        version: 1,
+        exported_at: full.exported_at,
+        pods: full.pods,
+        pod_members: full.pod_members,
+    })
+}
+
+pub fn import_pods_bundle(conn: &mut Connection, bundle: &PodsBundle) -> rusqlite::Result<PodsImportSummary> {
+    let tx = conn.transaction()?;
+
+    let mut pod_ids: HashMap<String, String> = HashMap::new();
+    for p in &bundle.pods {
+        let created = db::insert_pod(&tx, &p.new)?;
+        if !p.enabled {
+            db::set_pod_enabled(&tx, &created.id, false)?;
+        }
+        pod_ids.insert(p.old_id.clone(), created.id);
+    }
+
+    let mut pod_members_count = 0usize;
+    for m in &bundle.pod_members {
+        let Some(new_pod_id) = pod_ids.get(&m.old_pod_id) else { continue };
+        // profile isn't part of this import — only usable if it still exists as-is
+        let Some(profile) = db::get_profile(&tx, &m.old_profile_id)? else { continue };
+        db::add_pod_member(&tx, new_pod_id, &profile.id)?;
+        pod_members_count += 1;
+    }
+
+    tx.commit()?;
+    Ok(PodsImportSummary {
+        pods: pod_ids.len(),
+        pod_members: pod_members_count,
+    })
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ProxiesBundle {
+    pub version: u32,
+    pub exported_at: String,
+    pub proxies: Vec<IdTagged<db::NewProxy>>,
+}
+
+#[derive(Serialize)]
+pub struct ProxiesImportSummary {
+    pub proxies: usize,
+}
+
+pub fn export_proxies_bundle(conn: &Connection) -> rusqlite::Result<ProxiesBundle> {
+    let full = export_bundle(conn)?;
+    Ok(ProxiesBundle {
+        version: 1,
+        exported_at: full.exported_at,
+        proxies: full.proxies,
+    })
+}
+
+pub fn import_proxies_bundle(
+    conn: &mut Connection,
+    bundle: &ProxiesBundle,
+) -> rusqlite::Result<ProxiesImportSummary> {
+    let tx = conn.transaction()?;
+    for item in &bundle.proxies {
+        db::insert_proxy(&tx, &item.data)?;
+    }
+    tx.commit()?;
+    Ok(ProxiesImportSummary {
+        proxies: bundle.proxies.len(),
+    })
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BlacklistBundle {
+    pub version: u32,
+    pub exported_at: String,
+    pub blacklist: Vec<BlacklistExport>,
+}
+
+#[derive(Serialize)]
+pub struct BlacklistImportSummary {
+    pub blacklist: usize,
+}
+
+pub fn export_blacklist_bundle(conn: &Connection) -> rusqlite::Result<BlacklistBundle> {
+    let full = export_bundle(conn)?;
+    Ok(BlacklistBundle {
+        version: 1,
+        exported_at: full.exported_at,
+        blacklist: full.blacklist,
+    })
+}
+
+pub fn import_blacklist_bundle(
+    conn: &mut Connection,
+    bundle: &BlacklistBundle,
+) -> rusqlite::Result<BlacklistImportSummary> {
+    let tx = conn.transaction()?;
+    let mut count = 0usize;
+    for b in &bundle.blacklist {
+        let profile_id = match &b.old_profile_id {
+            Some(old) => db::get_profile(&tx, old)?.map(|_| old.clone()),
+            None => None,
+        };
+        db::add_blacklist_entry(&tx, profile_id.as_deref(), &b.username)?;
+        count += 1;
+    }
+    tx.commit()?;
+    Ok(BlacklistImportSummary { blacklist: count })
+}

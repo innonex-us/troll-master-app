@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, Campaign, Platform, Pod, Profile, ProfileGroup, Proxy } from "../api";
 import { RulesPanel } from "./RulesPanel";
 import { ProfileManagePanel } from "./ProfileManagePanel";
@@ -20,6 +21,7 @@ export function ProfilesPage() {
   const [showBulkRule, setShowBulkRule] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<Record<string, string>>({});
   const [bulkStatus, setBulkStatus] = useState("");
+  const [backupStatus, setBackupStatus] = useState("");
 
   const [platform, setPlatform] = useState<Platform>("instagram");
   const [displayName, setDisplayName] = useState("");
@@ -136,6 +138,34 @@ export function ProfilesPage() {
     await refresh();
   }
 
+  async function exportProfiles() {
+    setBackupStatus("");
+    try {
+      const path = await save({
+        defaultPath: "jarveeauto-profiles.json",
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path) return;
+      await api.exportProfilesBackup(path);
+      setBackupStatus(`exported to ${path}`);
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
+
+  async function importProfiles() {
+    setBackupStatus("");
+    try {
+      const path = await open({ multiple: false, filters: [{ name: "JSON", extensions: ["json"] }] });
+      if (!path || Array.isArray(path)) return;
+      const summary = await api.importProfilesBackup(path);
+      setBackupStatus(`imported ${summary.profiles} profiles, ${summary.rules} rules`);
+      await refresh();
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
+
   async function duplicateProfile(id: string) {
     try {
       await api.duplicateProfile(id);
@@ -206,11 +236,20 @@ export function ProfilesPage() {
           <h1>Profiles</h1>
           <div className="sub">Social accounts under management</div>
         </div>
-        <button type="button" className="primary" onClick={() => setShowAddProfile(true)}>
-          + Add Profile
-        </button>
+        <div className="row">
+          <button type="button" onClick={exportProfiles}>
+            Export
+          </button>
+          <button type="button" onClick={importProfiles}>
+            Import
+          </button>
+          <button type="button" className="primary" onClick={() => setShowAddProfile(true)}>
+            + Add Profile
+          </button>
+        </div>
       </div>
       {error && <p className="error">{error}</p>}
+      {backupStatus && <p className="hint">{backupStatus}</p>}
 
       <div className="panel">
         <h3>Groups</h3>

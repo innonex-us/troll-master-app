@@ -47,6 +47,12 @@ pub fn insert_proxy(conn: &Connection, new: &NewProxy) -> rusqlite::Result<Proxy
     conn.query_row("SELECT * FROM proxies WHERE id = ?1", params![id], row_to_proxy)
 }
 
+pub fn get_proxy(conn: &Connection, id: &str) -> rusqlite::Result<Option<Proxy>> {
+    use rusqlite::OptionalExtension;
+    conn.query_row("SELECT * FROM proxies WHERE id = ?1", params![id], row_to_proxy)
+        .optional()
+}
+
 pub fn list_proxies(conn: &Connection) -> rusqlite::Result<Vec<Proxy>> {
     let mut stmt = conn.prepare("SELECT * FROM proxies ORDER BY created_at DESC")?;
     let rows = stmt.query_map([], row_to_proxy)?;

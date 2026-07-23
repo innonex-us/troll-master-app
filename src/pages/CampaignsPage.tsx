@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, Campaign, Profile, ProfileGroup } from "../api";
 import { CampaignRulesPanel } from "./CampaignRulesPanel";
 import { Badge } from "../components/Badge";
@@ -19,6 +20,7 @@ export function CampaignsPage() {
 
   const [groupFilter, setGroupFilter] = useState("");
   const [actionStatus, setActionStatus] = useState<Record<string, string>>({});
+  const [backupStatus, setBackupStatus] = useState("");
 
   async function refresh() {
     try {
@@ -49,6 +51,34 @@ export function CampaignsPage() {
     if (manageCampaign) refreshEnrollment(manageCampaign.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manageCampaign?.id]);
+
+  async function exportCampaigns() {
+    setBackupStatus("");
+    try {
+      const path = await save({
+        defaultPath: "jarveeauto-campaigns.json",
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path) return;
+      await api.exportCampaignsBackup(path);
+      setBackupStatus(`exported to ${path}`);
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
+
+  async function importCampaigns() {
+    setBackupStatus("");
+    try {
+      const path = await open({ multiple: false, filters: [{ name: "JSON", extensions: ["json"] }] });
+      if (!path || Array.isArray(path)) return;
+      const summary = await api.importCampaignsBackup(path);
+      setBackupStatus(`imported ${summary.campaigns} campaigns, ${summary.campaign_rules} campaign rules`);
+      await refresh();
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
 
   async function addCampaign(e: FormEvent) {
     e.preventDefault();
@@ -112,11 +142,20 @@ export function CampaignsPage() {
             every enrolled profile immediately.
           </div>
         </div>
-        <button type="button" className="primary" onClick={() => setShowAdd(true)}>
-          + Create Campaign
-        </button>
+        <div className="row">
+          <button type="button" onClick={exportCampaigns}>
+            Export
+          </button>
+          <button type="button" onClick={importCampaigns}>
+            Import
+          </button>
+          <button type="button" className="primary" onClick={() => setShowAdd(true)}>
+            + Create Campaign
+          </button>
+        </div>
       </div>
       {error && <p className="error">{error}</p>}
+      {backupStatus && <p className="hint">{backupStatus}</p>}
 
       <div className="panel">
         <table className="mini-table">

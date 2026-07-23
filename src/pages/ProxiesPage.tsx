@@ -1,10 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, Proxy } from "../api";
 import { Modal } from "../components/Modal";
 
 export function ProxiesPage() {
   const [proxies, setProxies] = useState<Proxy[]>([]);
   const [error, setError] = useState("");
+  const [backupStatus, setBackupStatus] = useState("");
   const [showAdd, setShowAdd] = useState(false);
 
   const [label, setLabel] = useState("");
@@ -54,18 +56,56 @@ export function ProxiesPage() {
     await refresh();
   }
 
+  async function exportProxies() {
+    setBackupStatus("");
+    try {
+      const path = await save({
+        defaultPath: "jarveeauto-proxies.json",
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path) return;
+      await api.exportProxiesBackup(path);
+      setBackupStatus(`exported to ${path}`);
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
+
+  async function importProxies() {
+    setBackupStatus("");
+    try {
+      const path = await open({ multiple: false, filters: [{ name: "JSON", extensions: ["json"] }] });
+      if (!path || Array.isArray(path)) return;
+      const summary = await api.importProxiesBackup(path);
+      setBackupStatus(`imported ${summary.proxies} proxies`);
+      await refresh();
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
         <div>
           <h1>Proxies</h1>
           <div className="sub">Assign one proxy per profile to keep sessions isolated</div>
+          <div className="sub">Export includes proxy credentials in plaintext — handle the file accordingly.</div>
         </div>
-        <button type="button" className="primary" onClick={() => setShowAdd(true)}>
-          + Add Proxy
-        </button>
+        <div className="row">
+          <button type="button" onClick={exportProxies}>
+            Export
+          </button>
+          <button type="button" onClick={importProxies}>
+            Import
+          </button>
+          <button type="button" className="primary" onClick={() => setShowAdd(true)}>
+            + Add Proxy
+          </button>
+        </div>
       </div>
       {error && <p className="error">{error}</p>}
+      {backupStatus && <p className="hint">{backupStatus}</p>}
 
       <div className="panel">
       <table className="mini-table">

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, Pod, PodEngagement, PodPost, Profile, ProfileGroup } from "../api";
 import { Badge } from "../components/Badge";
 import { Modal } from "../components/Modal";
@@ -10,6 +11,7 @@ export function PodsPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [groups, setGroups] = useState<ProfileGroup[]>([]);
   const [error, setError] = useState("");
+  const [backupStatus, setBackupStatus] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [managePod, setManagePod] = useState<Pod | null>(null);
   const [members, setMembers] = useState<Record<string, Set<string>>>({});
@@ -54,6 +56,34 @@ export function PodsPage() {
     if (managePod) refreshMembers(managePod.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [managePod?.id]);
+
+  async function exportPods() {
+    setBackupStatus("");
+    try {
+      const path = await save({
+        defaultPath: "jarveeauto-pods.json",
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path) return;
+      await api.exportPodsBackup(path);
+      setBackupStatus(`exported to ${path}`);
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
+
+  async function importPods() {
+    setBackupStatus("");
+    try {
+      const path = await open({ multiple: false, filters: [{ name: "JSON", extensions: ["json"] }] });
+      if (!path || Array.isArray(path)) return;
+      const summary = await api.importPodsBackup(path);
+      setBackupStatus(`imported ${summary.pods} pods, ${summary.pod_members} members`);
+      await refresh();
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
 
   function toggleAction(action: string) {
     setActions((a) => (a.includes(action) ? a.filter((x) => x !== action) : [...a, action]));
@@ -128,11 +158,20 @@ export function PodsPage() {
             something new, the rest automatically like/comment it within a set time window.
           </div>
         </div>
-        <button type="button" className="primary" onClick={() => setShowAdd(true)}>
-          + Create Pod
-        </button>
+        <div className="row">
+          <button type="button" onClick={exportPods}>
+            Export
+          </button>
+          <button type="button" onClick={importPods}>
+            Import
+          </button>
+          <button type="button" className="primary" onClick={() => setShowAdd(true)}>
+            + Create Pod
+          </button>
+        </div>
       </div>
       {error && <p className="error">{error}</p>}
+      {backupStatus && <p className="hint">{backupStatus}</p>}
 
       <div className="panel">
         <table className="mini-table">

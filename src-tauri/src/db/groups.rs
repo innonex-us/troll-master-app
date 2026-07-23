@@ -39,6 +39,12 @@ pub fn insert_group(conn: &Connection, new: &NewProfileGroup) -> rusqlite::Resul
     )
 }
 
+pub fn get_group(conn: &Connection, id: &str) -> rusqlite::Result<Option<ProfileGroup>> {
+    use rusqlite::OptionalExtension;
+    conn.query_row("SELECT * FROM profile_groups WHERE id = ?1", params![id], row_to_group)
+        .optional()
+}
+
 pub fn list_groups(conn: &Connection) -> rusqlite::Result<Vec<ProfileGroup>> {
     let mut stmt = conn.prepare("SELECT * FROM profile_groups ORDER BY created_at DESC")?;
     let rows = stmt.query_map([], row_to_group)?;

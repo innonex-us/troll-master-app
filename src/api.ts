@@ -268,6 +268,12 @@ export type ImportSummary = {
   settings_imported: boolean;
 };
 
+export type ProfilesImportSummary = { profiles: number; rules: number };
+export type CampaignsImportSummary = { campaigns: number; campaign_rules: number };
+export type PodsImportSummary = { pods: number; pod_members: number };
+export type ProxiesImportSummary = { proxies: number };
+export type BlacklistImportSummary = { blacklist: number };
+
 export type CampaignRuleState = {
   id: string;
   campaign_rule_id: string;
@@ -453,4 +459,19 @@ export const api = {
   exportBackup: (path: string) => invoke<void>("export_backup_cmd", { path }),
   importBackup: (path: string, includeSettings: boolean) =>
     invoke<ImportSummary>("import_backup_cmd", { path, includeSettings }),
+
+  exportProfilesBackup: (path: string) => invoke<void>("export_profiles_backup_cmd", { path }),
+  importProfilesBackup: (path: string) =>
+    invoke<ProfilesImportSummary>("import_profiles_backup_cmd", { path }),
+  exportCampaignsBackup: (path: string) => invoke<void>("export_campaigns_backup_cmd", { path }),
+  importCampaignsBackup: (path: string) =>
+    invoke<CampaignsImportSummary>("import_campaigns_backup_cmd", { path }),
+  exportPodsBackup: (path: string) => invoke<void>("export_pods_backup_cmd", { path }),
+  importPodsBackup: (path: string) => invoke<PodsImportSummary>("import_pods_backup_cmd", { path }),
+  exportProxiesBackup: (path: string) => invoke<void>("export_proxies_backup_cmd", { path }),
+  importProxiesBackup: (path: string) =>
+    invoke<ProxiesImportSummary>("import_proxies_backup_cmd", { path }),
+  exportBlacklistBackup: (path: string) => invoke<void>("export_blacklist_backup_cmd", { path }),
+  importBlacklistBackup: (path: string) =>
+    invoke<BlacklistImportSummary>("import_blacklist_backup_cmd", { path }),
 };

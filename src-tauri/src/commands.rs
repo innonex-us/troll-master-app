@@ -650,3 +650,108 @@ pub async fn import_backup_cmd(
     let mut conn = state.db.0.lock().unwrap();
     backup::import_bundle(&mut conn, &bundle, include_settings).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn export_profiles_backup_cmd(state: State<'_, Arc<AppState>>, path: String) -> Result<(), String> {
+    let bundle = {
+        let conn = state.db.0.lock().unwrap();
+        backup::export_profiles_bundle(&conn).map_err(|e| e.to_string())?
+    };
+    let json = serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_profiles_backup_cmd(
+    state: State<'_, Arc<AppState>>,
+    path: String,
+) -> Result<backup::ProfilesImportSummary, String> {
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let bundle: backup::ProfilesBundle = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let mut conn = state.db.0.lock().unwrap();
+    backup::import_profiles_bundle(&mut conn, &bundle).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_campaigns_backup_cmd(state: State<'_, Arc<AppState>>, path: String) -> Result<(), String> {
+    let bundle = {
+        let conn = state.db.0.lock().unwrap();
+        backup::export_campaigns_bundle(&conn).map_err(|e| e.to_string())?
+    };
+    let json = serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_campaigns_backup_cmd(
+    state: State<'_, Arc<AppState>>,
+    path: String,
+) -> Result<backup::CampaignsImportSummary, String> {
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let bundle: backup::CampaignsBundle = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let mut conn = state.db.0.lock().unwrap();
+    backup::import_campaigns_bundle(&mut conn, &bundle).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_pods_backup_cmd(state: State<'_, Arc<AppState>>, path: String) -> Result<(), String> {
+    let bundle = {
+        let conn = state.db.0.lock().unwrap();
+        backup::export_pods_bundle(&conn).map_err(|e| e.to_string())?
+    };
+    let json = serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_pods_backup_cmd(
+    state: State<'_, Arc<AppState>>,
+    path: String,
+) -> Result<backup::PodsImportSummary, String> {
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let bundle: backup::PodsBundle = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let mut conn = state.db.0.lock().unwrap();
+    backup::import_pods_bundle(&mut conn, &bundle).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_proxies_backup_cmd(state: State<'_, Arc<AppState>>, path: String) -> Result<(), String> {
+    let bundle = {
+        let conn = state.db.0.lock().unwrap();
+        backup::export_proxies_bundle(&conn).map_err(|e| e.to_string())?
+    };
+    let json = serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_proxies_backup_cmd(
+    state: State<'_, Arc<AppState>>,
+    path: String,
+) -> Result<backup::ProxiesImportSummary, String> {
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let bundle: backup::ProxiesBundle = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let mut conn = state.db.0.lock().unwrap();
+    backup::import_proxies_bundle(&mut conn, &bundle).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_blacklist_backup_cmd(state: State<'_, Arc<AppState>>, path: String) -> Result<(), String> {
+    let bundle = {
+        let conn = state.db.0.lock().unwrap();
+        backup::export_blacklist_bundle(&conn).map_err(|e| e.to_string())?
+    };
+    let json = serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_blacklist_backup_cmd(
+    state: State<'_, Arc<AppState>>,
+    path: String,
+) -> Result<backup::BlacklistImportSummary, String> {
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let bundle: backup::BlacklistBundle = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let mut conn = state.db.0.lock().unwrap();
+    backup::import_blacklist_bundle(&mut conn, &bundle).map_err(|e| e.to_string())
+}

@@ -1,9 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, BlacklistEntry } from "../api";
 
 export function BlacklistPage() {
   const [entries, setEntries] = useState<BlacklistEntry[]>([]);
   const [error, setError] = useState("");
+  const [backupStatus, setBackupStatus] = useState("");
   const [username, setUsername] = useState("");
 
   async function refresh() {
@@ -35,6 +37,34 @@ export function BlacklistPage() {
     await refresh();
   }
 
+  async function exportBlacklist() {
+    setBackupStatus("");
+    try {
+      const path = await save({
+        defaultPath: "jarveeauto-blacklist.json",
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path) return;
+      await api.exportBlacklistBackup(path);
+      setBackupStatus(`exported to ${path}`);
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
+
+  async function importBlacklist() {
+    setBackupStatus("");
+    try {
+      const path = await open({ multiple: false, filters: [{ name: "JSON", extensions: ["json"] }] });
+      if (!path || Array.isArray(path)) return;
+      const summary = await api.importBlacklistBackup(path);
+      setBackupStatus(`imported ${summary.blacklist} entries`);
+      await refresh();
+    } catch (err) {
+      setBackupStatus(`error: ${err}`);
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -45,8 +75,17 @@ export function BlacklistPage() {
             follow/unfollow/like/comment/DM attempt
           </div>
         </div>
+        <div className="row">
+          <button type="button" onClick={exportBlacklist}>
+            Export
+          </button>
+          <button type="button" onClick={importBlacklist}>
+            Import
+          </button>
+        </div>
       </div>
       {error && <p className="error">{error}</p>}
+      {backupStatus && <p className="hint">{backupStatus}</p>}
 
       <form className="row panel" onSubmit={addEntry}>
         <input
