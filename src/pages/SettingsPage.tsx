@@ -3,6 +3,13 @@ import { getVersion } from "@tauri-apps/api/app";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, AppSettings } from "../api";
 import { checkForUpdate, installUpdate, type Update } from "../update";
+import { getTheme, setTheme, type Theme } from "../theme";
+
+const THEMES: { id: Theme; label: string }[] = [
+  { id: "system", label: "Auto (follow OS)" },
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" },
+];
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -20,6 +27,7 @@ export function SettingsPage() {
   const [clearStatus, setClearStatus] = useState("");
 
   const [pingStatus, setPingStatus] = useState("");
+  const [theme, setThemeState] = useState<Theme>(getTheme());
 
   const [backupStatus, setBackupStatus] = useState("");
   const [includeSettingsOnImport, setIncludeSettingsOnImport] = useState(false);
@@ -186,6 +194,26 @@ export function SettingsPage() {
         </div>
       </div>
       {error && <p className="error">{error}</p>}
+
+      <div className="panel">
+        <h3>Appearance</h3>
+        <p className="hint">Theme preference is stored locally on this machine.</p>
+        <div className="row">
+          {THEMES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={theme === t.id ? "primary" : ""}
+              onClick={() => {
+                setTheme(t.id);
+                setThemeState(t.id);
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <form className="panel" onSubmit={saveSettings}>
         <h3>Engine</h3>

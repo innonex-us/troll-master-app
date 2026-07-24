@@ -1,5 +1,13 @@
-/* ---------- Design tokens ---------- */
+/* ---------- Design tokens ----------
+ * Dark is the default (:root). Light is applied two ways:
+ *   - :root[data-theme="light"]   → user forced light (see src/theme.ts)
+ *   - @media (prefers-color-scheme: light) :root:not([data-theme]) → "system" mode
+ * The light token block is duplicated across both selectors intentionally so each
+ * path is self-contained; keep them in sync.
+ * Non-color tokens (series colors, fonts) are theme-independent and defined once here.
+ */
 :root {
+  /* dark (default) */
   --bg: #0a0d0f;
   --bg-raised: #111619;
   --bg-inset: #0d1113;
@@ -12,6 +20,9 @@
   --accent: #ff9d3d;
   --accent-dim: #a86526;
   --accent-glow: rgba(255, 157, 61, 0.35);
+  --accent-soft: rgba(255, 157, 61, 0.08);
+  --on-accent: #1a1200;
+  --on-badge: #0a0d0f;
 
   --ok: #3ddc84;
   --ok-dim: rgba(61, 220, 132, 0.16);
@@ -22,7 +33,12 @@
   --info: #4db8ff;
   --info-dim: rgba(77, 184, 255, 0.16);
 
-  /* fixed per-platform series colors for charts — assigned by entity, never cycled */
+  --hover: rgba(255, 255, 255, 0.04);
+  --row-hover: rgba(255, 255, 255, 0.02);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --backdrop: rgba(0, 0, 0, 0.55);
+
+  /* fixed per-platform series colors for charts — theme-independent, never cycled */
   --series-ig: #e85d9c;
   --series-tw: #4db8ff;
   --series-fb: #7c93ff;
@@ -36,16 +52,72 @@
   color-scheme: dark;
 }
 
+:root[data-theme="light"] {
+  --bg: #f4f5f7;
+  --bg-raised: #ffffff;
+  --bg-inset: #eceef1;
+  --line: rgba(17, 20, 24, 0.1);
+  --line-strong: rgba(17, 20, 24, 0.18);
+  --text: #1a1d21;
+  --text-dim: #565d66;
+  --text-faint: #878e97;
+
+  --accent: #e07b1e;
+  --accent-dim: #b5651a;
+  --accent-glow: rgba(224, 123, 30, 0.22);
+  --accent-soft: rgba(224, 123, 30, 0.12);
+  --on-accent: #ffffff;
+  --on-badge: #ffffff;
+
+  --ok: #1a9d54;
+  --ok-dim: rgba(26, 157, 84, 0.14);
+  --warn: #b5820a;
+  --warn-dim: rgba(181, 130, 10, 0.15);
+  --err: #d63a3a;
+  --err-dim: rgba(214, 58, 58, 0.13);
+  --info: #1f7fd0;
+  --info-dim: rgba(31, 127, 208, 0.13);
+
+  --hover: rgba(17, 20, 24, 0.045);
+  --row-hover: rgba(17, 20, 24, 0.025);
+  --shadow: rgba(20, 24, 28, 0.12);
+  --backdrop: rgba(20, 24, 28, 0.35);
+
+  color-scheme: light;
+}
+
 @media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f3f2ee;
+  :root:not([data-theme]) {
+    --bg: #f4f5f7;
     --bg-raised: #ffffff;
-    --bg-inset: #ebe9e3;
-    --line: rgba(20, 20, 15, 0.1);
-    --line-strong: rgba(20, 20, 15, 0.2);
-    --text: #17191a;
-    --text-dim: #5b6265;
-    --text-faint: #8b9295;
+    --bg-inset: #eceef1;
+    --line: rgba(17, 20, 24, 0.1);
+    --line-strong: rgba(17, 20, 24, 0.18);
+    --text: #1a1d21;
+    --text-dim: #565d66;
+    --text-faint: #878e97;
+
+    --accent: #e07b1e;
+    --accent-dim: #b5651a;
+    --accent-glow: rgba(224, 123, 30, 0.22);
+    --accent-soft: rgba(224, 123, 30, 0.12);
+    --on-accent: #ffffff;
+    --on-badge: #ffffff;
+
+    --ok: #1a9d54;
+    --ok-dim: rgba(26, 157, 84, 0.14);
+    --warn: #b5820a;
+    --warn-dim: rgba(181, 130, 10, 0.15);
+    --err: #d63a3a;
+    --err-dim: rgba(214, 58, 58, 0.13);
+    --info: #1f7fd0;
+    --info-dim: rgba(31, 127, 208, 0.13);
+
+    --hover: rgba(17, 20, 24, 0.045);
+    --row-hover: rgba(17, 20, 24, 0.025);
+    --shadow: rgba(20, 24, 28, 0.12);
+    --backdrop: rgba(20, 24, 28, 0.35);
+
     color-scheme: light;
   }
 }
@@ -181,12 +253,12 @@ body {
 
 .nav button:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--hover);
 }
 
 .nav button.active {
   color: var(--text);
-  background: rgba(255, 157, 61, 0.08);
+  background: var(--accent-soft);
   border-left: 2px solid var(--accent);
 }
 
@@ -200,11 +272,42 @@ body {
 
 .sidebar-footer {
   margin-top: auto;
-  padding: 10px 8px 0 8px;
+  padding: 12px 8px 0 8px;
   border-top: 1px solid var(--line);
   font-family: var(--mono);
   font-size: 11px;
   color: var(--text-faint);
+}
+
+.theme-toggle {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 2px;
+}
+
+.theme-toggle button {
+  all: unset;
+  flex: 1;
+  text-align: center;
+  padding: 5px 4px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.theme-toggle button:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.theme-toggle button.active {
+  color: var(--on-accent);
+  background: var(--accent);
 }
 
 .content {
@@ -275,11 +378,12 @@ body {
 .panel {
   background: var(--bg-raised);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 18px 20px;
   margin-bottom: 20px;
   max-width: 100%;
   overflow-x: auto;
+  box-shadow: 0 1px 2px var(--shadow);
 }
 
 .panel h2, .panel h3, .panel h4 {
@@ -347,13 +451,13 @@ button:active {
 
 button.primary {
   background: var(--accent);
-  color: #1a1200;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 
 button.primary:hover {
   filter: brightness(1.08);
-  color: #1a1200;
+  color: var(--on-accent);
 }
 
 button.danger:hover {
@@ -393,7 +497,7 @@ button.ghost {
 }
 
 .mini-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--row-hover);
 }
 
 .mini-table td.empty {
@@ -507,12 +611,12 @@ button.ghost {
 
 .platform-icon:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--hover);
 }
 
 .platform-icon.active {
   color: var(--text);
-  background: rgba(255, 157, 61, 0.08);
+  background: var(--accent-soft);
   border-left: 2px solid var(--accent);
 }
 
@@ -526,7 +630,7 @@ button.ghost {
   font-family: var(--mono);
   font-size: 9.5px;
   font-weight: 700;
-  color: #0a0d0f;
+  color: var(--on-badge);
   flex-shrink: 0;
 }
 
@@ -718,7 +822,7 @@ button.ghost {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--backdrop);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -740,7 +844,7 @@ button.ghost {
   max-width: 640px;
   max-height: 88vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px var(--shadow);
 }
 
 .modal-dialog.wide {
