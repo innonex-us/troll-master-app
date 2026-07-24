@@ -208,14 +208,18 @@ body {
 }
 
 .content {
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 28px 36px 60px 36px;
 }
 
 .page-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
+  gap: 10px 20px;
   margin-bottom: 22px;
 }
 
@@ -274,6 +278,8 @@ body {
   border-radius: 10px;
   padding: 18px 20px;
   margin-bottom: 20px;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .panel h2, .panel h3, .panel h4 {
@@ -363,6 +369,7 @@ button.ghost {
 /* ---------- Tables ---------- */
 .mini-table {
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
   margin-bottom: 4px;
 }
@@ -468,6 +475,7 @@ button.ghost {
 
 .profiles-layout {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: flex-start;
 }
@@ -494,6 +502,7 @@ button.ghost {
   color: var(--text-dim);
   cursor: pointer;
   border-left: 2px solid transparent;
+  max-width: 100%;
 }
 
 .platform-icon:hover {
@@ -523,6 +532,10 @@ button.ghost {
 
 .platform-name {
   flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .platform-count {
@@ -538,6 +551,7 @@ button.ghost {
 
 .bulk-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   background: var(--accent-glow);
@@ -606,6 +620,7 @@ button.ghost {
 
 .donut-wrap {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 18px;
 }
@@ -750,6 +765,8 @@ button.ghost {
   text-transform: none;
   letter-spacing: normal;
   color: var(--text);
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .modal-close {
@@ -757,6 +774,7 @@ button.ghost {
   line-height: 1;
   padding: 2px 8px;
   color: var(--text-dim);
+  flex-shrink: 0;
 }
 
 .modal-close:hover {
