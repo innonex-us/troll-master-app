@@ -47,6 +47,15 @@ const WEEKDAYS: { day: number; label: string }[] = [
   { day: 7, label: "Sun" },
 ];
 
+// One-click speed tiers → daily_limit + delay window. Lower/slower is safer for
+// account health; faster tiers trip platform rate-limits sooner.
+const SPEED_PRESETS: { label: string; daily: number; min: number; max: number }[] = [
+  { label: "Slow", daily: 20, min: 300, max: 900 },
+  { label: "Normal", daily: 50, min: 120, max: 600 },
+  { label: "Fast", daily: 100, min: 60, max: 240 },
+  { label: "Aggressive", daily: 150, min: 30, max: 120 },
+];
+
 export function RuleForm({
   platforms,
   onSubmit,
@@ -81,6 +90,12 @@ export function RuleForm({
 
   function toggleDay(day: number) {
     setActiveDays((d) => (d.includes(day) ? d.filter((x) => x !== day) : [...d, day].sort()));
+  }
+
+  function applyPreset(p: (typeof SPEED_PRESETS)[number]) {
+    setDailyLimit(p.daily);
+    setMinDelay(p.min);
+    setMaxDelay(p.max);
   }
 
   function addStep() {
@@ -173,6 +188,14 @@ export function RuleForm({
           </option>
         ))}
       </select>
+      <div className="speed-presets">
+        <span className="hint">Speed:</span>
+        {SPEED_PRESETS.map((p) => (
+          <button key={p.label} type="button" className="ghost" onClick={() => applyPreset(p)}>
+            {p.label}
+          </button>
+        ))}
+      </div>
       <input
         type="number"
         min={1}

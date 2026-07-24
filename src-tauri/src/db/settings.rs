@@ -38,6 +38,10 @@ pub struct AppSettings {
     pub backoff_cap_hours: i64,
     /// Whether new profiles ramp up daily limits gradually over ~2 weeks. Applied live.
     pub warmup_enabled: bool,
+    /// Per-profile cap on un-returned follows (followed, not following back, not yet
+    /// unfollowed). While a profile is at/over this, its `follow` rules pause until
+    /// unfollow rules drain the backlog. `0` = unlimited. Applied live.
+    pub max_pending_follows: i64,
 }
 
 impl Default for AppSettings {
@@ -48,6 +52,7 @@ impl Default for AppSettings {
             backoff_base_mins: 5,
             backoff_cap_hours: 6,
             warmup_enabled: true,
+            max_pending_follows: 0,
         }
     }
 }
@@ -60,6 +65,7 @@ pub fn get_settings(conn: &Connection) -> AppSettings {
         backoff_base_mins: get_int(conn, "backoff_base_mins", d.backoff_base_mins),
         backoff_cap_hours: get_int(conn, "backoff_cap_hours", d.backoff_cap_hours),
         warmup_enabled: get_bool(conn, "warmup_enabled", d.warmup_enabled),
+        max_pending_follows: get_int(conn, "max_pending_follows", d.max_pending_follows),
     }
 }
 
@@ -69,6 +75,7 @@ pub fn save_settings(conn: &Connection, s: &AppSettings) -> rusqlite::Result<()>
     set_raw(conn, "backoff_base_mins", &s.backoff_base_mins.to_string())?;
     set_raw(conn, "backoff_cap_hours", &s.backoff_cap_hours.to_string())?;
     set_raw(conn, "warmup_enabled", if s.warmup_enabled { "true" } else { "false" })?;
+    set_raw(conn, "max_pending_follows", &s.max_pending_follows.to_string())?;
     Ok(())
 }
 

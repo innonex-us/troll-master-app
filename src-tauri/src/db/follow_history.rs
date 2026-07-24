@@ -20,6 +20,18 @@ pub fn record_follow(
     Ok(())
 }
 
+/// How many accounts this profile has followed that haven't followed back and
+/// haven't been unfollowed yet — the un-returned-follow backlog. Used to cap
+/// runaway following until unfollow rules drain it.
+pub fn count_pending_follows(conn: &Connection, profile_id: &str) -> rusqlite::Result<i64> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM follow_history
+         WHERE profile_id = ?1 AND unfollowed_at IS NULL AND follow_status != 'following_back'",
+        params![profile_id],
+        |row| row.get(0),
+    )
+}
+
 /// Usernames this profile followed more than `days_threshold` days ago that
 /// haven't been confirmed as following back and haven't already been unfollowed.
 pub fn list_due_non_followbacks(

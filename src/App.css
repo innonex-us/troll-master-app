@@ -578,8 +578,19 @@ button.ghost {
 }
 
 .rule-form .sequence-editor,
-.rule-form .schedule-editor {
+.rule-form .schedule-editor,
+.rule-form .speed-presets {
   flex: 1 1 100%;
+}
+
+.speed-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.speed-presets .hint {
+  margin: 0 4px 0 0;
 }
 
 .schedule-editor {

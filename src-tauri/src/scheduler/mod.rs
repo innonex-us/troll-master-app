@@ -56,6 +56,15 @@ fn within_schedule(start: i64, end: i64, days: &[i64]) -> bool {
     }
 }
 
+/// True when the profile's un-returned-follow backlog is at/over the global cap
+/// (`max_pending_follows`), meaning new `follow` actions should pause until
+/// unfollow rules drain it. `0` = unlimited (never caps).
+fn over_pending_follow_cap(state: &Arc<AppState>, profile_id: &str) -> bool {
+    let conn = state.db.0.lock().unwrap();
+    let cap = db::get_settings(&conn).max_pending_follows;
+    cap > 0 && db::count_pending_follows(&conn, profile_id).unwrap_or(0) >= cap
+}
+
 fn still_in_backoff(backoff_until: &Option<String>) -> bool {
     backoff_until
         .as_deref()
@@ -198,6 +207,9 @@ async fn tick_standalone_rules(app_handle: &AppHandle, state: &Arc<AppState>, ti
         if !within_schedule(rule.active_hours_start, rule.active_hours_end, &rule.active_days) {
             continue;
         }
+        if rule.action_type == "follow" && over_pending_follow_cap(state, &profile.id) {
+            continue;
+        }
 
         let rule_id = rule.id.clone();
         refill_targets_if_low(
@@ -317,6 +329,9 @@ async fn tick_campaigns(app_handle: &AppHandle, state: &Arc<AppState>, tick_inte
             continue;
         }
         if !within_schedule(rule.active_hours_start, rule.active_hours_end, &rule.active_days) {
+            continue;
+        }
+        if rule.action_type == "follow" && over_pending_follow_cap(state, &profile.id) {
             continue;
         }
 

@@ -270,6 +270,18 @@ export function SettingsPage() {
             Warmup curve for new profiles
           </label>
         </div>
+        <div className="row">
+          <label className="hint">
+            Max pending (un-returned) follows per profile — 0 = unlimited
+            <br />
+            <input
+              type="number"
+              min={0}
+              value={settings.max_pending_follows}
+              onChange={(e) => setSettings({ ...settings, max_pending_follows: Number(e.target.value) })}
+            />
+          </label>
+        </div>
         <button type="submit" className="primary">
           Save Engine Settings
         </button>

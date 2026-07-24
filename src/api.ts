@@ -199,6 +199,7 @@ export type AppSettings = {
   backoff_base_mins: number;
   backoff_cap_hours: number;
   warmup_enabled: boolean;
+  max_pending_follows: number;
 };
 
 export type BlacklistEntry = {
