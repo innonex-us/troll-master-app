@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, Campaign, Platform, Pod, Profile, ProfileGroup, Proxy } from "../api";
-import { RulesPanel } from "./RulesPanel";
-import { ProfileManagePanel } from "./ProfileManagePanel";
 import { Badge } from "../components/Badge";
 import { Modal } from "../components/Modal";
 import { BulkToolbar } from "../components/BulkToolbar";
 import { BulkRuleModal } from "../components/BulkRuleModal";
+import { PlatformIconRail } from "../components/PlatformIconRail";
+import { ProfileDetailModal } from "../components/ProfileDetailModal";
 
 const VALID_PLATFORMS: Platform[] = ["instagram", "twitter", "facebook", "tiktok", "linkedin", "youtube"];
 
@@ -45,20 +45,21 @@ export function ProfilesPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [pods, setPods] = useState<Pod[]>([]);
   const [error, setError] = useState("");
-  const [rulesModal, setRulesModal] = useState<Profile | null>(null);
-  const [manageModal, setManageModal] = useState<Profile | null>(null);
+  const [detailProfile, setDetailProfile] = useState<Profile | null>(null);
   const [showAddProfile, setShowAddProfile] = useState(false);
   const [showBulkRule, setShowBulkRule] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<Record<string, string>>({});
   const [bulkStatus, setBulkStatus] = useState("");
   const [backupStatus, setBackupStatus] = useState("");
 
+  const [platformFilter, setPlatformFilter] = useState<Platform>("instagram");
+
   const [platform, setPlatform] = useState<Platform>("instagram");
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [proxyId, setProxyId] = useState<string>("");
   const [groupId, setGroupId] = useState<string>("");
-  const [deviceName, setDeviceName] = useState("");
 
   const [newGroupName, setNewGroupName] = useState("");
   const [groupFilter, setGroupFilter] = useState("");
@@ -94,31 +95,33 @@ export function ProfilesPage() {
     refresh();
   }, []);
 
-  // keep modal profile data in sync after actions elsewhere refresh the list
+  // keep the open detail modal's profile data in sync after actions elsewhere refresh the list
   useEffect(() => {
-    if (rulesModal) setRulesModal(profiles.find((p) => p.id === rulesModal.id) ?? null);
-    if (manageModal) setManageModal(profiles.find((p) => p.id === manageModal.id) ?? null);
+    if (detailProfile) setDetailProfile(profiles.find((p) => p.id === detailProfile.id) ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profiles]);
 
   async function addProfile(e: FormEvent) {
     e.preventDefault();
     try {
-      const created = await api.createProfile({
-        platform,
-        display_name: displayName,
-        username,
-        proxy_id: proxyId || null,
-        device_name: deviceName,
-      });
+      const created = await api.createProfile(
+        {
+          platform,
+          display_name: displayName || username,
+          username,
+          proxy_id: proxyId || null,
+          device_name: "",
+        },
+        password,
+      );
       if (groupId) {
         await api.setProfileGroup(created.id, groupId);
       }
       setDisplayName("");
       setUsername("");
+      setPassword("");
       setProxyId("");
       setGroupId("");
-      setDeviceName("");
       setShowAddProfile(false);
       await refresh();
     } catch (err) {
@@ -247,7 +250,13 @@ export function ProfilesPage() {
     }
   }
 
-  const visibleProfiles = groupFilter ? profiles.filter((p) => p.group_id === groupFilter) : profiles;
+  const platformCounts = profiles.reduce<Record<string, number>>((acc, p) => {
+    acc[p.platform] = (acc[p.platform] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const byPlatform = profiles.filter((p) => p.platform === platformFilter);
+  const visibleProfiles = groupFilter ? byPlatform.filter((p) => p.group_id === groupFilter) : byPlatform;
   const selectedProfiles = profiles.filter((p) => selected.has(p.id));
 
   function toggleSelected(id: string) {
@@ -325,7 +334,14 @@ export function ProfilesPage() {
             style={{ display: "none" }}
             onChange={importProfilesCsv}
           />
-          <button type="button" className="primary" onClick={() => setShowAddProfile(true)}>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => {
+              setPlatform(platformFilter);
+              setShowAddProfile(true);
+            }}
+          >
             + Add Profile
           </button>
         </div>
@@ -350,7 +366,7 @@ export function ProfilesPage() {
             Create Group
           </button>
           <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)}>
-            <option value="">Show all profiles</option>
+            <option value="">Show all in platform</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
@@ -434,95 +450,100 @@ export function ProfilesPage() {
       )}
       {bulkStatus && <p className="hint">{bulkStatus}</p>}
 
-      <div className="panel">
-      <table className="mini-table">
-        <thead>
-          <tr>
-            <th>
-              <input
-                type="checkbox"
-                checked={visibleProfiles.length > 0 && selected.size === visibleProfiles.length}
-                onChange={toggleSelectAll}
-              />
-            </th>
-            <th>Name</th>
-            <th>Username</th>
-            <th>Platform</th>
-            <th>Status</th>
-            <th>Device</th>
-            <th>Group</th>
-            <th>Proxy</th>
-            <th>Login</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {visibleProfiles.map((p) => (
-            <tr key={p.id}>
-              <td>
-                <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelected(p.id)} />
-              </td>
-              <td>{p.display_name}</td>
-              <td>{p.username}</td>
-              <td>{p.platform}</td>
-              <td>
-                <Badge status={p.enabled ? p.status : "paused"} />
-              </td>
-              <td>
-                <div className="hint">{p.device_name || "unnamed"}</div>
-                <div className="hint">{p.device_id}</div>
-              </td>
-              <td>
-                <select value={p.group_id ?? ""} onChange={(e) => assignGroup(p.id, e.target.value)}>
-                  <option value="">No group</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td>
-                <select value={p.proxy_id ?? ""} onChange={(e) => assignProxy(p.id, e.target.value)}>
-                  <option value="">No proxy</option>
-                  {proxies.map((px) => (
-                    <option key={px.id} value={px.id}>
-                      {px.label}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td>
-                <button type="button" onClick={() => captureLogin(p.id)}>
-                  Capture Login
-                </button>
-                {captureStatus[p.id] && <div className="hint">{captureStatus[p.id]}</div>}
-              </td>
-              <td>
-                <button type="button" onClick={() => setRulesModal(p)}>
-                  Rules
-                </button>
-                <button type="button" onClick={() => setManageModal(p)}>
-                  Manage
-                </button>
-                <button type="button" onClick={() => duplicateProfile(p.id)}>
-                  Duplicate
-                </button>
-                <button type="button" className="danger" onClick={() => removeProfile(p.id)}>
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-          {visibleProfiles.length === 0 && (
-            <tr>
-              <td className="empty" colSpan={10}>
-                No profiles yet — add one to get started.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      <div className="profiles-layout">
+        <PlatformIconRail active={platformFilter} onSelect={setPlatformFilter} counts={platformCounts} />
+
+        <div className="profiles-content">
+          <div className="panel">
+            <table className="mini-table">
+              <thead>
+                <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={visibleProfiles.length > 0 && selected.size === visibleProfiles.length}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Status</th>
+                  <th>Device</th>
+                  <th>Group</th>
+                  <th>Proxy</th>
+                  <th>Login</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleProfiles.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelected(p.id)} />
+                    </td>
+                    <td>
+                      <button type="button" className="ghost" onClick={() => setDetailProfile(p)}>
+                        {p.display_name}
+                      </button>
+                    </td>
+                    <td>{p.username}</td>
+                    <td>
+                      <Badge status={p.enabled ? p.status : "paused"} />
+                    </td>
+                    <td>
+                      <div className="hint">{p.device_name || "unnamed"}</div>
+                      <div className="hint">{p.device_id}</div>
+                    </td>
+                    <td>
+                      <select value={p.group_id ?? ""} onChange={(e) => assignGroup(p.id, e.target.value)}>
+                        <option value="">No group</option>
+                        {groups.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <select value={p.proxy_id ?? ""} onChange={(e) => assignProxy(p.id, e.target.value)}>
+                        <option value="">No proxy</option>
+                        {proxies.map((px) => (
+                          <option key={px.id} value={px.id}>
+                            {px.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <button type="button" onClick={() => captureLogin(p.id)}>
+                        Capture Login
+                      </button>
+                      {captureStatus[p.id] && <div className="hint">{captureStatus[p.id]}</div>}
+                    </td>
+                    <td>
+                      <button type="button" onClick={() => setDetailProfile(p)}>
+                        Open
+                      </button>
+                      <button type="button" onClick={() => duplicateProfile(p.id)}>
+                        Duplicate
+                      </button>
+                      <button type="button" className="danger" onClick={() => removeProfile(p.id)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {visibleProfiles.length === 0 && (
+                  <tr>
+                    <td className="empty" colSpan={9}>
+                      No profiles on this platform yet — add one to get started.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       {showAddProfile && (
@@ -537,16 +558,22 @@ export function ProfilesPage() {
               <option value="youtube">YouTube</option>
             </select>
             <input
-              placeholder="Display name"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              required
-            />
-            <input
               placeholder="Username (on platform)"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <input
+              placeholder="Display name (optional — defaults to username)"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
             />
             <select value={proxyId} onChange={(e) => setProxyId(e.target.value)}>
               <option value="">No proxy</option>
@@ -564,28 +591,24 @@ export function ProfilesPage() {
                 </option>
               ))}
             </select>
-            <input
-              placeholder="Device name (optional)"
-              value={deviceName}
-              onChange={(e) => setDeviceName(e.target.value)}
-            />
             <button type="submit" className="primary">
               Add Profile
             </button>
           </form>
+          <p className="hint">
+            Device name, screen size, and device identity are assigned automatically.
+          </p>
         </Modal>
       )}
 
-      {rulesModal && (
-        <Modal title={`Rules — ${rulesModal.display_name}`} onClose={() => setRulesModal(null)} wide>
-          <RulesPanel profileId={rulesModal.id} platform={rulesModal.platform} />
-        </Modal>
-      )}
-
-      {manageModal && (
-        <Modal title={`Manage — ${manageModal.display_name}`} onClose={() => setManageModal(null)} wide>
-          <ProfileManagePanel profile={manageModal} onChanged={refresh} />
-        </Modal>
+      {detailProfile && (
+        <ProfileDetailModal
+          profile={detailProfile}
+          proxies={proxies}
+          groups={groups}
+          onClose={() => setDetailProfile(null)}
+          onChanged={refresh}
+        />
       )}
 
       {showBulkRule && (

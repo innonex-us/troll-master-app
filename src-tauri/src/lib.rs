@@ -120,6 +120,8 @@ pub fn run() {
             commands::save_settings_cmd,
             commands::clear_old_logs_cmd,
             commands::get_app_data_dir_cmd,
+            commands::set_profile_display_name_cmd,
+            commands::set_profile_username_cmd,
             commands::set_profile_device_name_cmd,
             commands::regenerate_device_id_cmd,
             commands::set_profile_password_cmd,

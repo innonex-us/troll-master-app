@@ -209,6 +209,24 @@ pub fn set_profile_activated_now(conn: &Connection, id: &str) -> rusqlite::Resul
     Ok(())
 }
 
+pub fn set_profile_display_name(conn: &Connection, id: &str, display_name: &str) -> rusqlite::Result<()> {
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE profiles SET display_name = ?1, updated_at = ?2 WHERE id = ?3",
+        params![display_name, now, id],
+    )?;
+    Ok(())
+}
+
+pub fn set_profile_username(conn: &Connection, id: &str, username: &str) -> rusqlite::Result<()> {
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE profiles SET username = ?1, updated_at = ?2 WHERE id = ?3",
+        params![username, now, id],
+    )?;
+    Ok(())
+}
+
 pub fn set_profile_device_name(conn: &Connection, id: &str, device_name: &str) -> rusqlite::Result<()> {
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(

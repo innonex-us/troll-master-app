@@ -2,28 +2,12 @@ import { useState, type FormEvent } from "react";
 import { api, Profile } from "../api";
 
 export function ProfileManagePanel({ profile, onChanged }: { profile: Profile; onChanged: () => void }) {
-  const [deviceName, setDeviceName] = useState(profile.device_name);
-  const [deviceStatus, setDeviceStatus] = useState("");
-
   const [password, setPassword] = useState("");
   const [passwordStatus, setPasswordStatus] = useState("");
   const [autoLoginStatus, setAutoLoginStatus] = useState("");
 
   const [cookiesJson, setCookiesJson] = useState("");
   const [cookieStatus, setCookieStatus] = useState("");
-
-  async function saveDeviceName(e: FormEvent) {
-    e.preventDefault();
-    await api.setProfileDeviceName(profile.id, deviceName);
-    setDeviceStatus("saved");
-    onChanged();
-  }
-
-  async function regenerateDeviceId() {
-    const newId = await api.regenerateDeviceId(profile.id);
-    setDeviceStatus(`new device ID: ${newId}`);
-    onChanged();
-  }
 
   async function savePassword(e: FormEvent) {
     e.preventDefault();
@@ -69,27 +53,6 @@ export function ProfileManagePanel({ profile, onChanged }: { profile: Profile; o
 
   return (
     <div className="rules-panel">
-      <h4>Device</h4>
-      <form className="row" onSubmit={saveDeviceName}>
-        <input
-          placeholder="Device name (e.g. Pixel 7)"
-          value={deviceName}
-          onChange={(e) => setDeviceName(e.target.value)}
-        />
-        <button type="submit" className="primary">
-          Save Device Name
-        </button>
-        <span className="hint">Device ID: {profile.device_id}</span>
-        <button type="button" className="ghost" onClick={regenerateDeviceId}>
-          Regenerate ID
-        </button>
-      </form>
-      {deviceStatus && <p className="hint">{deviceStatus}</p>}
-      <p className="hint">
-        Purely an organizational label — this is browser automation, not a real device, so there's no
-        actual IMEI behind it.
-      </p>
-
       <h4>Login — Auto Login (password)</h4>
       <p className="hint">
         Stores an encrypted password, then opens a real (visible) browser and fills the login form

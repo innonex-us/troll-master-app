@@ -349,7 +349,8 @@ export type PodEngagement = {
 
 export const api = {
   listProfiles: () => invoke<Profile[]>("list_profiles_cmd"),
-  createProfile: (newProfile: NewProfile) => invoke<Profile>("create_profile_cmd", { newProfile }),
+  createProfile: (newProfile: NewProfile, password?: string) =>
+    invoke<Profile>("create_profile_cmd", { newProfile, password: password || null }),
   deleteProfile: (id: string) => invoke<void>("delete_profile_cmd", { id }),
   setProfileProxy: (id: string, proxyId: string | null) =>
     invoke<void>("set_profile_proxy_cmd", { id, proxyId }),
@@ -357,6 +358,10 @@ export const api = {
     invoke<void>("set_profile_enabled_cmd", { id, enabled }),
   duplicateProfile: (id: string) => invoke<Profile>("duplicate_profile_cmd", { id }),
   captureLogin: (profileId: string) => invoke<void>("capture_login_cmd", { profileId }),
+  setProfileDisplayName: (id: string, displayName: string) =>
+    invoke<void>("set_profile_display_name_cmd", { id, displayName }),
+  setProfileUsername: (id: string, username: string) =>
+    invoke<void>("set_profile_username_cmd", { id, username }),
   setProfileDeviceName: (id: string, deviceName: string) =>
     invoke<void>("set_profile_device_name_cmd", { id, deviceName }),
   regenerateDeviceId: (id: string) => invoke<string>("regenerate_device_id_cmd", { id }),

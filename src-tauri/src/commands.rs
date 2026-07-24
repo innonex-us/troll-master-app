@@ -36,10 +36,27 @@ pub async fn list_profiles_cmd(state: State<'_, Arc<AppState>>) -> Result<Vec<db
 pub async fn create_profile_cmd(
     state: State<'_, Arc<AppState>>,
     new_profile: db::NewProfile,
+    password: Option<String>,
 ) -> Result<db::Profile, String> {
+    let mut new_profile = new_profile;
+    if new_profile.device_name.trim().is_empty() {
+        new_profile.device_name = fingerprint::generate_device_name();
+    }
+
     let fp = fingerprint::generate();
     let conn = state.db.0.lock().unwrap();
-    db::insert_profile(&conn, &new_profile, &fp).map_err(|e| e.to_string())
+    let created = db::insert_profile(&conn, &new_profile, &fp).map_err(|e| e.to_string())?;
+
+    match password {
+        Some(pw) if !pw.is_empty() => {
+            let encrypted = crate::crypto::encrypt_string(&pw)?;
+            db::set_login_password_enc(&conn, &created.id, Some(&encrypted)).map_err(|e| e.to_string())?;
+            db::get_profile(&conn, &created.id)
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| "profile not found after creation".to_string())
+        }
+        _ => Ok(created),
+    }
 }
 
 #[tauri::command]
@@ -465,6 +482,26 @@ pub async fn clear_old_logs_cmd(state: State<'_, Arc<AppState>>, days: i64) -> R
 #[tauri::command]
 pub async fn get_app_data_dir_cmd(state: State<'_, Arc<AppState>>) -> Result<String, String> {
     Ok(state.app_data_dir.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn set_profile_display_name_cmd(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    display_name: String,
+) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::set_profile_display_name(&conn, &id, &display_name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_profile_username_cmd(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    username: String,
+) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::set_profile_username(&conn, &id, &username).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

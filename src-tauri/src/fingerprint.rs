@@ -47,6 +47,19 @@ pub fn generate_device_id() -> String {
     (0..15).map(|_| rng.gen_range(0..10).to_string()).collect()
 }
 
+const DEVICE_NAMES: &[&str] = &[
+    "Pixel 8", "Pixel 7 Pro", "Galaxy S23", "Galaxy S22 Ultra", "iPhone 14 Pro",
+    "iPhone 13", "OnePlus 11", "Xiaomi 13", "MacBook Pro", "MacBook Air",
+    "Windows Desktop", "Surface Laptop",
+];
+
+/// A cosmetic device label auto-assigned when a profile is created without one —
+/// same "not a real device" caveat as `generate_device_id`.
+pub fn generate_device_name() -> String {
+    let mut rng = rand::thread_rng();
+    DEVICE_NAMES.choose(&mut rng).unwrap().to_string()
+}
+
 pub fn generate() -> Fingerprint {
     let mut rng = rand::thread_rng();
     let user_agent = USER_AGENTS.choose(&mut rng).unwrap().to_string();
