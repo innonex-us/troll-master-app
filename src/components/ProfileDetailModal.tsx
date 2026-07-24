@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { api, Profile, ProfileGroup, Proxy } from "../api";
+import { useEffect, useState } from "react";
+import { api, Profile, ProfileGroup, Proxy, WelcomeDmConfig } from "../api";
 import { Modal } from "./Modal";
 import { ProfileManagePanel } from "../pages/ProfileManagePanel";
 import { RulesPanel } from "../pages/RulesPanel";
@@ -13,7 +13,7 @@ const PLATFORM_LABEL: Record<string, string> = {
   youtube: "YouTube",
 };
 
-type Tab = "info" | "login" | "rules";
+type Tab = "info" | "login" | "rules" | "welcome";
 
 export function ProfileDetailModal({
   profile,
@@ -34,6 +34,47 @@ export function ProfileDetailModal({
   const [username, setUsername] = useState(profile.username);
   const [deviceName, setDeviceName] = useState(profile.device_name);
   const [infoStatus, setInfoStatus] = useState("");
+
+  const [welcome, setWelcome] = useState<WelcomeDmConfig | null>(null);
+  const [welcomeEnabled, setWelcomeEnabled] = useState(false);
+  const [welcomePool, setWelcomePool] = useState("");
+  const [welcomeDaily, setWelcomeDaily] = useState(10);
+  const [welcomeMin, setWelcomeMin] = useState(120);
+  const [welcomeMax, setWelcomeMax] = useState(600);
+  const [welcomeStatus, setWelcomeStatus] = useState("");
+
+  useEffect(() => {
+    if (tab !== "welcome") return;
+    api.getWelcomeDmConfig(profile.id).then((c) => {
+      setWelcome(c);
+      setWelcomeEnabled(c?.enabled ?? false);
+      setWelcomePool(c?.message_pool.join("\n") ?? "");
+      setWelcomeDaily(c?.daily_limit ?? 10);
+      setWelcomeMin(c?.min_delay_sec ?? 120);
+      setWelcomeMax(c?.max_delay_sec ?? 600);
+    });
+  }, [tab, profile.id]);
+
+  async function saveWelcome() {
+    const message_pool = welcomePool
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    try {
+      const saved = await api.upsertWelcomeDmConfig({
+        profile_id: profile.id,
+        enabled: welcomeEnabled,
+        message_pool,
+        daily_limit: welcomeDaily,
+        min_delay_sec: welcomeMin,
+        max_delay_sec: welcomeMax,
+      });
+      setWelcome(saved);
+      setWelcomeStatus("saved");
+    } catch (err) {
+      setWelcomeStatus(`error: ${err}`);
+    }
+  }
 
   async function saveDisplayName() {
     await api.setProfileDisplayName(profile.id, displayName);
@@ -85,6 +126,9 @@ export function ProfileDetailModal({
         </button>
         <button type="button" className={tab === "rules" ? "primary" : "ghost"} onClick={() => setTab("rules")}>
           Rules
+        </button>
+        <button type="button" className={tab === "welcome" ? "primary" : "ghost"} onClick={() => setTab("welcome")}>
+          Welcome DM
         </button>
       </div>
 
@@ -176,6 +220,75 @@ export function ProfileDetailModal({
       {tab === "login" && <ProfileManagePanel profile={profile} onChanged={onChanged} />}
 
       {tab === "rules" && <RulesPanel profileId={profile.id} platform={profile.platform} />}
+
+      {tab === "welcome" && (
+        <div className="rules-panel">
+          <h4>Welcome DM to new followers</h4>
+          <p className="hint">
+            Periodically scans this profile's followers and DMs anyone new. The first scan just
+            captures your existing followers (they're never messaged) — only followers gained after
+            that get a welcome. Respects the daily limit, delay window, and blacklist.
+          </p>
+          <label className="hint">
+            <input
+              type="checkbox"
+              checked={welcomeEnabled}
+              onChange={(e) => setWelcomeEnabled(e.target.checked)}
+            />{" "}
+            Enabled
+          </label>
+          <textarea
+            placeholder="message pool, one per line — supports {spintax|variants}"
+            value={welcomePool}
+            onChange={(e) => setWelcomePool(e.target.value)}
+            rows={3}
+            style={{ width: "100%", marginTop: 8 }}
+          />
+          <div className="row">
+            <label className="hint">
+              Daily limit
+              <br />
+              <input
+                type="number"
+                min={1}
+                value={welcomeDaily}
+                onChange={(e) => setWelcomeDaily(Number(e.target.value))}
+              />
+            </label>
+            <label className="hint">
+              Min delay (s)
+              <br />
+              <input
+                type="number"
+                min={1}
+                value={welcomeMin}
+                onChange={(e) => setWelcomeMin(Number(e.target.value))}
+              />
+            </label>
+            <label className="hint">
+              Max delay (s)
+              <br />
+              <input
+                type="number"
+                min={1}
+                value={welcomeMax}
+                onChange={(e) => setWelcomeMax(Number(e.target.value))}
+              />
+            </label>
+          </div>
+          <div className="row">
+            <button type="button" className="primary" onClick={saveWelcome}>
+              Save
+            </button>
+            {welcome && (
+              <span className="hint">
+                {welcome.seeded ? "baseline captured — welcoming new followers" : "not yet seeded — first scan will capture your current followers"}
+              </span>
+            )}
+            {welcomeStatus && <span className="hint">{welcomeStatus}</span>}
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }

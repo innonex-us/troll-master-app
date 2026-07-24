@@ -13,6 +13,7 @@ mod profiles;
 mod proxies;
 mod rules;
 mod settings;
+mod welcome_dm;
 
 pub use blacklist::*;
 pub use campaign_rule_state::*;
@@ -29,6 +30,7 @@ pub use profiles::*;
 pub use proxies::*;
 pub use rules::*;
 pub use settings::*;
+pub use welcome_dm::*;
 
 use rusqlite::Connection;
 use std::path::Path;
@@ -261,7 +263,29 @@ CREATE TABLE IF NOT EXISTS pod_engagements (
     UNIQUE(pod_post_id, acting_profile_id, action_type)
 );
 
+CREATE TABLE IF NOT EXISTS known_followers (
+    id TEXT PRIMARY KEY,
+    profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    username TEXT NOT NULL,
+    first_seen_at TEXT NOT NULL,
+    welcomed INTEGER NOT NULL DEFAULT 0,
+    welcomed_at TEXT,
+    UNIQUE(profile_id, username)
+);
+
+CREATE TABLE IF NOT EXISTS welcome_dm_config (
+    profile_id TEXT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    message_pool TEXT NOT NULL DEFAULT '[]',
+    daily_limit INTEGER NOT NULL DEFAULT 10,
+    min_delay_sec INTEGER NOT NULL DEFAULT 120,
+    max_delay_sec INTEGER NOT NULL DEFAULT 600,
+    last_scan_at TEXT,
+    seeded INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE INDEX IF NOT EXISTS idx_action_log_profile_type ON action_log(profile_id, action_type, executed_at);
+CREATE INDEX IF NOT EXISTS idx_known_followers_unwelcomed ON known_followers(profile_id, welcomed);
 CREATE INDEX IF NOT EXISTS idx_mpc_unreplied ON monitored_post_comments(monitored_post_id, replied);
 CREATE INDEX IF NOT EXISTS idx_dm_seq_due ON dm_sequence_progress(rule_id, status, next_send_at);
 CREATE INDEX IF NOT EXISTS idx_pod_posts_active ON pod_posts(pod_id, expires_at);

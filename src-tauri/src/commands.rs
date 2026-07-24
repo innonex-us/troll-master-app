@@ -667,6 +667,24 @@ pub async fn import_cookies_cmd(
 }
 
 #[tauri::command]
+pub async fn get_welcome_dm_config_cmd(
+    state: State<'_, Arc<AppState>>,
+    profile_id: String,
+) -> Result<Option<db::WelcomeDmConfig>, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::get_welcome_dm_config(&conn, &profile_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn upsert_welcome_dm_config_cmd(
+    state: State<'_, Arc<AppState>>,
+    config: db::NewWelcomeDmConfig,
+) -> Result<db::WelcomeDmConfig, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::upsert_welcome_dm_config(&conn, &config).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn export_backup_cmd(state: State<'_, Arc<AppState>>, path: String) -> Result<(), String> {
     let bundle = {
         let conn = state.db.0.lock().unwrap();

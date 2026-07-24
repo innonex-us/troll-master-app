@@ -133,6 +133,7 @@ pub fn spawn(app_handle: AppHandle, state: Arc<AppState>) {
             tick_comment_replies(&app_handle, &state, tick_interval_secs).await;
             tick_dm_sequences(&app_handle, &state, tick_interval_secs).await;
             tick_pods(&app_handle, &state, tick_interval_secs).await;
+            tick_welcome_dms(&app_handle, &state, tick_interval_secs).await;
         }
     });
 }
@@ -893,5 +894,134 @@ async fn tick_pods(app_handle: &AppHandle, state: &Arc<AppState>, tick_interval_
                 }
             }
         }
+    }
+}
+
+/// Auto-welcomes NEW followers with a DM. Periodically scrapes the profile's own
+/// followers (reusing the followers-of scraper against the profile's own username),
+/// records them, and DMs any that appear after the baseline seed pass — respecting
+/// the config's daily limit, delay window, and the blacklist. The first scan only
+/// seeds the baseline so pre-existing followers are never messaged.
+async fn tick_welcome_dms(app_handle: &AppHandle, state: &Arc<AppState>, tick_interval_secs: u64) {
+    let configs = {
+        let conn = state.db.0.lock().unwrap();
+        match db::list_enabled_welcome_configs(&conn) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("[scheduler] failed to list welcome-dm configs: {e}");
+                return;
+            }
+        }
+    };
+
+    for config in configs {
+        let profile = {
+            let conn = state.db.0.lock().unwrap();
+            match db::get_profile(&conn, &config.profile_id) {
+                Ok(Some(p)) if p.status == "active" && p.enabled => p,
+                _ => continue,
+            }
+        };
+
+        // Re-scrape own followers on the monitor cadence.
+        let due = {
+            let conn = state.db.0.lock().unwrap();
+            let refresh_secs = db::get_settings(&conn).monitor_refresh_mins.max(1) * 60;
+            match &config.last_scan_at {
+                Some(last) => match chrono::DateTime::parse_from_rfc3339(last) {
+                    Ok(t) => (Utc::now() - t.with_timezone(&Utc)).num_seconds() >= refresh_secs,
+                    Err(_) => true,
+                },
+                None => true,
+            }
+        };
+
+        if due {
+            match executor::scrape_targets(state, &profile, "followers_of", &profile.username, 100, false).await {
+                Ok(followers) => {
+                    let conn = state.db.0.lock().unwrap();
+                    // Before the baseline is seeded, everyone currently following is
+                    // marked already-welcomed so they never get a DM.
+                    let welcomed = !config.seeded;
+                    for username in &followers {
+                        let _ = db::upsert_known_follower(&conn, &profile.id, username, welcomed);
+                    }
+                    if !config.seeded {
+                        let _ = db::mark_seeded(&conn, &profile.id);
+                    }
+                    let _ = db::set_last_scan(&conn, &profile.id);
+                }
+                Err(e) => eprintln!("[scheduler] welcome-dm follower scrape failed for {}: {e}", profile.username),
+            }
+        }
+
+        // Only send once the baseline has been captured (seeded on a prior scan).
+        let seeded_now = {
+            let conn = state.db.0.lock().unwrap();
+            db::get_welcome_dm_config(&conn, &profile.id).ok().flatten().map(|c| c.seeded).unwrap_or(false)
+        };
+        if !seeded_now {
+            continue;
+        }
+
+        let (count_today, last_at) = {
+            let conn = state.db.0.lock().unwrap();
+            let count = db::count_today(&conn, &profile.id, "welcome_dm").unwrap_or(0);
+            let last = db::last_executed_at(&conn, &profile.id, "welcome_dm").unwrap_or(None);
+            (count, last)
+        };
+        if count_today >= config.daily_limit.max(1) {
+            continue;
+        }
+        if !delay_gate_passes(&last_at, config.min_delay_sec, config.max_delay_sec, tick_interval_secs) {
+            continue;
+        }
+
+        let target = {
+            let conn = state.db.0.lock().unwrap();
+            match db::list_unwelcomed(&conn, &profile.id, 1) {
+                Ok(mut v) if !v.is_empty() => v.remove(0),
+                _ => continue,
+            }
+        };
+
+        let blacklisted = {
+            let conn = state.db.0.lock().unwrap();
+            db::is_blacklisted(&conn, &profile.id, &target).unwrap_or(false)
+        };
+
+        // Pick one message from the pool; the sidecar resolves any {spintax} in it.
+        let message = if config.message_pool.is_empty() {
+            "Hey {there|!} 👋 thanks for the follow!".to_string()
+        } else {
+            let idx = rand::thread_rng().gen_range(0..config.message_pool.len());
+            config.message_pool[idx].clone()
+        };
+
+        let outcome = if blacklisted {
+            executor::ActionOutcome {
+                status: "skipped".to_string(),
+                message: format!("{target} is blacklisted"),
+            }
+        } else {
+            executor::run_action(state, &profile, "dm", &target, &[], &message, "like").await
+        };
+
+        {
+            let conn = state.db.0.lock().unwrap();
+            let _ = db::insert_log(&conn, &profile.id, "welcome_dm", &target, &outcome.status, Some(&outcome.message));
+            let _ = db::mark_welcomed(&conn, &profile.id, &target);
+            if outcome.status == "challenged" || outcome.status == "banned" {
+                let _ = db::set_profile_status(&conn, &profile.id, &outcome.status);
+            }
+        }
+
+        let _ = app_handle.emit(
+            "action-log",
+            serde_json::json!({
+                "profileId": profile.id, "actionType": "welcome_dm", "target": target,
+                "status": outcome.status, "message": outcome.message,
+            }),
+        );
     }
 }

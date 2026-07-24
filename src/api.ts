@@ -202,6 +202,26 @@ export type AppSettings = {
   max_pending_follows: number;
 };
 
+export type WelcomeDmConfig = {
+  profile_id: string;
+  enabled: boolean;
+  message_pool: string[];
+  daily_limit: number;
+  min_delay_sec: number;
+  max_delay_sec: number;
+  last_scan_at: string | null;
+  seeded: boolean;
+};
+
+export type NewWelcomeDmConfig = {
+  profile_id: string;
+  enabled: boolean;
+  message_pool: string[];
+  daily_limit: number;
+  min_delay_sec: number;
+  max_delay_sec: number;
+};
+
 export type BlacklistEntry = {
   id: string;
   profile_id: string | null;
@@ -370,6 +390,10 @@ export const api = {
   setProfileEnabled: (id: string, enabled: boolean) =>
     invoke<void>("set_profile_enabled_cmd", { id, enabled }),
   duplicateProfile: (id: string) => invoke<Profile>("duplicate_profile_cmd", { id }),
+  getWelcomeDmConfig: (profileId: string) =>
+    invoke<WelcomeDmConfig | null>("get_welcome_dm_config_cmd", { profileId }),
+  upsertWelcomeDmConfig: (config: NewWelcomeDmConfig) =>
+    invoke<WelcomeDmConfig>("upsert_welcome_dm_config_cmd", { config }),
   captureLogin: (profileId: string) => invoke<void>("capture_login_cmd", { profileId }),
   setProfileDisplayName: (id: string, displayName: string) =>
     invoke<void>("set_profile_display_name_cmd", { id, displayName }),
