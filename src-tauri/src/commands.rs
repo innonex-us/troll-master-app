@@ -157,6 +157,27 @@ pub async fn delete_rule_cmd(state: State<'_, Arc<AppState>>, id: String) -> Res
     db::delete_rule(&conn, &id).map_err(|e| e.to_string())
 }
 
+/// Standalone scrape for the Tools page: runs a scrape with the given profile's
+/// session and returns the raw list (usernames for followers_of, post URLs for
+/// hashtag) without touching any rule. The frontend can then export it to CSV.
+#[tauri::command]
+pub async fn scrape_export_cmd(
+    state: State<'_, Arc<AppState>>,
+    profile_id: String,
+    source_type: String,
+    seed: String,
+    limit: i64,
+    skip_no_avatar: bool,
+) -> Result<Vec<String>, String> {
+    let profile = {
+        let conn = state.db.0.lock().unwrap();
+        db::get_profile(&conn, &profile_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "profile not found".to_string())?
+    };
+    executor::scrape_targets(&state, &profile, &source_type, &seed, limit, skip_no_avatar).await
+}
+
 #[tauri::command]
 pub async fn refill_rule_targets_cmd(
     state: State<'_, Arc<AppState>>,
@@ -482,6 +503,13 @@ pub async fn clear_old_logs_cmd(state: State<'_, Arc<AppState>>, days: i64) -> R
 #[tauri::command]
 pub async fn get_app_data_dir_cmd(state: State<'_, Arc<AppState>>) -> Result<String, String> {
     Ok(state.app_data_dir.to_string_lossy().to_string())
+}
+
+/// Writes plain text (e.g. a CSV export) to a user-chosen path. The path comes
+/// from the native save dialog on the frontend.
+#[tauri::command]
+pub async fn write_text_file_cmd(path: String, content: String) -> Result<(), String> {
+    std::fs::write(&path, content).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

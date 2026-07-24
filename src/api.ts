@@ -419,6 +419,9 @@ export const api = {
     invoke<void>("set_rule_enabled_cmd", { id, enabled }),
   deleteRule: (id: string) => invoke<void>("delete_rule_cmd", { id }),
   refillRuleTargets: (ruleId: string) => invoke<number>("refill_rule_targets_cmd", { ruleId }),
+  scrapeExport: (profileId: string, sourceType: string, seed: string, limit: number, skipNoAvatar: boolean) =>
+    invoke<string[]>("scrape_export_cmd", { profileId, sourceType, seed, limit, skipNoAvatar }),
+  writeTextFile: (path: string, content: string) => invoke<void>("write_text_file_cmd", { path, content }),
   listDmSequenceProgress: (ruleId: string) =>
     invoke<DmSequenceProgress[]>("list_dm_sequence_progress_cmd", { ruleId }),
 
