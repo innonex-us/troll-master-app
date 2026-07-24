@@ -10,7 +10,7 @@ type GithubRelease = {
   prerelease: boolean;
 };
 
-const REPO = "innonex-us/jarvee";
+const REPO = "innonex-us/troll-master-app";
 
 export function ChangelogPage() {
   const [releases, setReleases] = useState<GithubRelease[]>([]);

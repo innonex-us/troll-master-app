@@ -44,7 +44,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEEzRTZFRjgyODI4MDg2NDMKUldSRGhvQ0NndS9tb3lRRUU1eFRGYW4vZm5KZ001QmoyREduUUdKWExGSzExUWdUR0ZRSi9IR1UK",
       "endpoints": [
-        "https://github.com/innonex-us/jarvee/releases/latest/download/latest.json"
+        "https://github.com/innonex-us/troll-master-app/releases/latest/download/latest.json"
       ]
     }
   }
