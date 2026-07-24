@@ -1,4 +1,4 @@
-# JarveeAuto
+# Troll Master
 
 A cross-platform desktop app for managing and automating social media accounts across
 Instagram, X/Twitter, Facebook, TikTok, LinkedIn, and YouTube — built with Tauri (Rust) +

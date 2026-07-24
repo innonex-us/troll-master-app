@@ -173,7 +173,7 @@ export function ProfilesPage() {
     setBackupStatus("");
     try {
       const path = await save({
-        defaultPath: "jarveeauto-profiles.json",
+        defaultPath: "troll-master-profiles.json",
         filters: [{ name: "JSON", extensions: ["json"] }],
       });
       if (!path) return;

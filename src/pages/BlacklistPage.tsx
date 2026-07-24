@@ -49,7 +49,7 @@ export function BlacklistPage() {
     setBackupStatus("");
     try {
       const path = await save({
-        defaultPath: "jarveeauto-blacklist.json",
+        defaultPath: "troll-master-blacklist.json",
         filters: [{ name: "JSON", extensions: ["json"] }],
       });
       if (!path) return;

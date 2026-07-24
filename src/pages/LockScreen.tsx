@@ -57,7 +57,7 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
       <form className="lock-card" onSubmit={submit}>
         <div className="brand">
           <span className="dot" />
-          JARVEE//AUTO
+          TROLL MASTER
         </div>
         <h2>{firstRun ? "Set a master password" : "Unlock"}</h2>
         {error && <p className="error">{error}</p>}

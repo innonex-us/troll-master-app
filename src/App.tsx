@@ -58,7 +58,7 @@ function App() {
       <aside className="sidebar">
         <div className="brand">
           <span className="dot" />
-          JARVEE//AUTO
+          TROLL MASTER
         </div>
         <nav className="nav">
           {NAV.map((item) => (

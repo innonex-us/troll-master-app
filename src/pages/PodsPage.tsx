@@ -61,7 +61,7 @@ export function PodsPage() {
     setBackupStatus("");
     try {
       const path = await save({
-        defaultPath: "jarveeauto-pods.json",
+        defaultPath: "troll-master-pods.json",
         filters: [{ name: "JSON", extensions: ["json"] }],
       });
       if (!path) return;

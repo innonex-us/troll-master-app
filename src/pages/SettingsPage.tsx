@@ -97,7 +97,7 @@ export function SettingsPage() {
     setBackupStatus("");
     try {
       const path = await save({
-        defaultPath: "jarveeauto-backup.json",
+        defaultPath: "troll-master-backup.json",
         filters: [{ name: "JSON", extensions: ["json"] }],
       });
       if (!path) return;
@@ -340,7 +340,7 @@ export function SettingsPage() {
           </button>
           {pingStatus && <span className="hint">{pingStatus}</span>}
         </div>
-        <p className="hint">jarveeAuto v{appVersion} · local automation engine</p>
+        <p className="hint">Troll Master v{appVersion} · local automation engine</p>
       </div>
 
       <div className="panel">

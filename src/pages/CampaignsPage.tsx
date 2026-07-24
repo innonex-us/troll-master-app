@@ -56,7 +56,7 @@ export function CampaignsPage() {
     setBackupStatus("");
     try {
       const path = await save({
-        defaultPath: "jarveeauto-campaigns.json",
+        defaultPath: "troll-master-campaigns.json",
         filters: [{ name: "JSON", extensions: ["json"] }],
       });
       if (!path) return;

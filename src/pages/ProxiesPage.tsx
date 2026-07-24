@@ -108,7 +108,7 @@ export function ProxiesPage() {
     setBackupStatus("");
     try {
       const path = await save({
-        defaultPath: "jarveeauto-proxies.json",
+        defaultPath: "troll-master-proxies.json",
         filters: [{ name: "JSON", extensions: ["json"] }],
       });
       if (!path) return;

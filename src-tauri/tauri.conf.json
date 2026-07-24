@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "jarveeauto",
+  "productName": "Troll Master",
   "version": "0.4.1",
   "identifier": "com.jarveeauto.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "jarveeauto",
+        "title": "Troll Master",
         "width": 1180,
         "height": 760,
         "minWidth": 900,
