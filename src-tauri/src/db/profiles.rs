@@ -179,6 +179,9 @@ pub fn duplicate_profile(conn: &Connection, source_id: &str) -> rusqlite::Result
             filter_skip_no_avatar: rule.filter_skip_no_avatar,
             reaction_type: rule.reaction_type,
             sequence_steps: rule.sequence_steps,
+            active_hours_start: rule.active_hours_start,
+            active_hours_end: rule.active_hours_end,
+            active_days: rule.active_days,
         };
         let inserted = crate::db::insert_rule(conn, &new_rule)?;
         if !rule.enabled {

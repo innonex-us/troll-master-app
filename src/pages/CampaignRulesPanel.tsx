@@ -77,6 +77,9 @@ export function CampaignRulesPanel({ campaignId }: { campaignId: string }) {
         dm_message: dmMessage,
         filter_skip_no_avatar: skipNoAvatar,
         reaction_type: reactionType,
+        active_hours_start: 0,
+        active_hours_end: 24,
+        active_days: [1, 2, 3, 4, 5, 6, 7],
       });
       setTargets("");
       setComments("");

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use chrono::Utc;
+use chrono::{Datelike, Local, Timelike, Utc};
 use rand::Rng;
 use tauri::{AppHandle, Emitter};
 
@@ -33,6 +33,27 @@ fn effective_daily_limit(conn: &rusqlite::Connection, daily_limit: i64, profile:
         .unwrap_or(999);
     let multiplier = warmup_multiplier(days_active);
     ((daily_limit as f64 * multiplier).floor() as i64).max(1)
+}
+
+/// A rule's active window: it may run only when the machine-local hour is in
+/// [start, end) (0..24 = always) and today's weekday is allowed (Mon=1..Sun=7).
+/// Note: uses the machine's local time, not the profile's fingerprint timezone.
+fn within_schedule(start: i64, end: i64, days: &[i64]) -> bool {
+    let now = Local::now();
+    let weekday = now.weekday().number_from_monday() as i64;
+    if !days.is_empty() && !days.contains(&weekday) {
+        return false;
+    }
+    if start == 0 && end >= 24 {
+        return true;
+    }
+    let hour = now.hour() as i64;
+    if start <= end {
+        hour >= start && hour < end
+    } else {
+        // wrapped window (e.g. 22..6): active late-night into the morning
+        hour >= start || hour < end
+    }
 }
 
 fn still_in_backoff(backoff_until: &Option<String>) -> bool {
@@ -174,6 +195,9 @@ async fn tick_standalone_rules(app_handle: &AppHandle, state: &Arc<AppState>, ti
         if profile.status != "active" || !profile.enabled {
             continue;
         }
+        if !within_schedule(rule.active_hours_start, rule.active_hours_end, &rule.active_days) {
+            continue;
+        }
 
         let rule_id = rule.id.clone();
         refill_targets_if_low(
@@ -290,6 +314,9 @@ async fn tick_campaigns(app_handle: &AppHandle, state: &Arc<AppState>, tick_inte
             }
         };
         if profile.status != "active" || !profile.enabled {
+            continue;
+        }
+        if !within_schedule(rule.active_hours_start, rule.active_hours_end, &rule.active_days) {
             continue;
         }
 

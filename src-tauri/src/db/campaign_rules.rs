@@ -16,6 +16,9 @@ pub struct CampaignRule {
     pub dm_message: String,
     pub filter_skip_no_avatar: bool,
     pub reaction_type: String,
+    pub active_hours_start: i64,
+    pub active_hours_end: i64,
+    pub active_days: Vec<i64>,
     pub created_at: String,
 }
 
@@ -40,6 +43,12 @@ pub struct NewCampaignRule {
     pub filter_skip_no_avatar: bool,
     #[serde(default = "default_reaction_type")]
     pub reaction_type: String,
+    #[serde(default)]
+    pub active_hours_start: i64,
+    #[serde(default = "default_hours_end")]
+    pub active_hours_end: i64,
+    #[serde(default = "default_active_days")]
+    pub active_days: Vec<i64>,
 }
 
 fn default_source_type() -> String {
@@ -50,9 +59,18 @@ fn default_reaction_type() -> String {
     "like".to_string()
 }
 
+fn default_hours_end() -> i64 {
+    24
+}
+
+fn default_active_days() -> Vec<i64> {
+    vec![1, 2, 3, 4, 5, 6, 7]
+}
+
 fn row_to_campaign_rule(row: &rusqlite::Row) -> rusqlite::Result<CampaignRule> {
     let target_source: String = row.get("target_source")?;
     let comment_pool: String = row.get("comment_pool")?;
+    let active_days: String = row.get("active_days")?;
     Ok(CampaignRule {
         id: row.get("id")?,
         campaign_id: row.get("campaign_id")?,
@@ -67,6 +85,9 @@ fn row_to_campaign_rule(row: &rusqlite::Row) -> rusqlite::Result<CampaignRule> {
         dm_message: row.get("dm_message")?,
         filter_skip_no_avatar: row.get::<_, i64>("filter_skip_no_avatar")? != 0,
         reaction_type: row.get("reaction_type")?,
+        active_hours_start: row.get("active_hours_start")?,
+        active_hours_end: row.get("active_hours_end")?,
+        active_days: serde_json::from_str(&active_days).unwrap_or_else(|_| vec![1, 2, 3, 4, 5, 6, 7]),
         created_at: row.get("created_at")?,
     })
 }
@@ -76,9 +97,10 @@ pub fn insert_campaign_rule(conn: &Connection, new: &NewCampaignRule) -> rusqlit
     let now = chrono::Utc::now().to_rfc3339();
     let target_source = serde_json::to_string(&new.target_source).unwrap();
     let comment_pool = serde_json::to_string(&new.comment_pool).unwrap();
+    let active_days = serde_json::to_string(&new.active_days).unwrap();
     conn.execute(
-        "INSERT INTO campaign_rules (id, campaign_id, action_type, daily_limit, min_delay_sec, max_delay_sec, target_source, comment_pool, source_type, source_seed, dm_message, filter_skip_no_avatar, reaction_type, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+        "INSERT INTO campaign_rules (id, campaign_id, action_type, daily_limit, min_delay_sec, max_delay_sec, target_source, comment_pool, source_type, source_seed, dm_message, filter_skip_no_avatar, reaction_type, active_hours_start, active_hours_end, active_days, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
         params![
             id,
             new.campaign_id,
@@ -93,6 +115,9 @@ pub fn insert_campaign_rule(conn: &Connection, new: &NewCampaignRule) -> rusqlit
             new.dm_message,
             new.filter_skip_no_avatar as i64,
             new.reaction_type,
+            new.active_hours_start,
+            new.active_hours_end,
+            active_days,
             now,
         ],
     )?;

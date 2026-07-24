@@ -4,6 +4,19 @@ import { Modal } from "../components/Modal";
 import { RuleForm } from "../components/RuleForm";
 import { BulkToolbar } from "../components/BulkToolbar";
 
+// Mirror of the Rust within_schedule gate, for showing a "sleeping" hint. Uses
+// the browser's local time (same machine as the scheduler).
+function isSleeping(rule: ActionRule): boolean {
+  const now = new Date();
+  const weekday = now.getDay() === 0 ? 7 : now.getDay(); // JS Sun=0 → 7, Mon=1..Sat=6
+  if (rule.active_days.length > 0 && !rule.active_days.includes(weekday)) return true;
+  const { active_hours_start: s, active_hours_end: e } = rule;
+  if (s === 0 && e >= 24) return false;
+  const h = now.getHours();
+  const inWindow = s <= e ? h >= s && h < e : h >= s || h < e;
+  return !inWindow;
+}
+
 export function RulesPanel({ profileId, platform }: { profileId: string; platform: Platform }) {
   const [rules, setRules] = useState<ActionRule[]>([]);
   const [loading, setLoading] = useState(false);
@@ -165,7 +178,9 @@ export function RulesPanel({ profileId, platform }: { profileId: string; platfor
                   {rule.target_source.length} (cursor {rule.target_cursor})
                 </td>
                 <td>
-                  {cooling ? (
+                  {isSleeping(rule) ? (
+                    <span className="hint">🌙 sleeping (off schedule)</span>
+                  ) : cooling ? (
                     <span className="hint">cooling down · {rule.consecutive_errors} errors</span>
                   ) : rule.consecutive_errors > 0 ? (
                     <span className="hint">{rule.consecutive_errors} recent errors</span>

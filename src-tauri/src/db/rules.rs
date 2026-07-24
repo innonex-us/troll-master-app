@@ -34,6 +34,11 @@ pub struct ActionRule {
     pub reaction_type: String,
     /// ordered steps used by the "dm_sequence" action; empty for every other action_type
     pub sequence_steps: Vec<DmSequenceStep>,
+    /// active-window scheduling: rule only runs when local hour is in [start, end)
+    /// (0..24 = always) and today's weekday is in active_days (Mon=1..Sun=7).
+    pub active_hours_start: i64,
+    pub active_hours_end: i64,
+    pub active_days: Vec<i64>,
     pub created_at: String,
 }
 
@@ -59,6 +64,12 @@ pub struct NewActionRule {
     pub reaction_type: String,
     #[serde(default)]
     pub sequence_steps: Vec<DmSequenceStep>,
+    #[serde(default)]
+    pub active_hours_start: i64,
+    #[serde(default = "default_hours_end")]
+    pub active_hours_end: i64,
+    #[serde(default = "default_active_days")]
+    pub active_days: Vec<i64>,
 }
 
 fn default_source_type() -> String {
@@ -69,10 +80,19 @@ fn default_reaction_type() -> String {
     "like".to_string()
 }
 
+fn default_hours_end() -> i64 {
+    24
+}
+
+fn default_active_days() -> Vec<i64> {
+    vec![1, 2, 3, 4, 5, 6, 7]
+}
+
 fn row_to_rule(row: &rusqlite::Row) -> rusqlite::Result<ActionRule> {
     let target_source: String = row.get("target_source")?;
     let comment_pool: String = row.get("comment_pool")?;
     let sequence_steps: String = row.get("sequence_steps")?;
+    let active_days: String = row.get("active_days")?;
     Ok(ActionRule {
         id: row.get("id")?,
         profile_id: row.get("profile_id")?,
@@ -92,6 +112,9 @@ fn row_to_rule(row: &rusqlite::Row) -> rusqlite::Result<ActionRule> {
         filter_skip_no_avatar: row.get::<_, i64>("filter_skip_no_avatar")? != 0,
         reaction_type: row.get("reaction_type")?,
         sequence_steps: serde_json::from_str(&sequence_steps).unwrap_or_default(),
+        active_hours_start: row.get("active_hours_start")?,
+        active_hours_end: row.get("active_hours_end")?,
+        active_days: serde_json::from_str(&active_days).unwrap_or_else(|_| vec![1, 2, 3, 4, 5, 6, 7]),
         created_at: row.get("created_at")?,
     })
 }
@@ -102,9 +125,10 @@ pub fn insert_rule(conn: &Connection, new: &NewActionRule) -> rusqlite::Result<A
     let target_source = serde_json::to_string(&new.target_source).unwrap();
     let comment_pool = serde_json::to_string(&new.comment_pool).unwrap();
     let sequence_steps = serde_json::to_string(&new.sequence_steps).unwrap();
+    let active_days = serde_json::to_string(&new.active_days).unwrap();
     conn.execute(
-        "INSERT INTO action_rules (id, profile_id, action_type, enabled, daily_limit, min_delay_sec, max_delay_sec, target_source, target_cursor, comment_pool, source_type, source_seed, consecutive_errors, backoff_until, dm_message, filter_skip_no_avatar, reaction_type, sequence_steps, created_at)
-         VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10, 0, NULL, ?11, ?12, ?13, ?14, ?15)",
+        "INSERT INTO action_rules (id, profile_id, action_type, enabled, daily_limit, min_delay_sec, max_delay_sec, target_source, target_cursor, comment_pool, source_type, source_seed, consecutive_errors, backoff_until, dm_message, filter_skip_no_avatar, reaction_type, sequence_steps, active_hours_start, active_hours_end, active_days, created_at)
+         VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10, 0, NULL, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
         params![
             id,
             new.profile_id,
@@ -120,6 +144,9 @@ pub fn insert_rule(conn: &Connection, new: &NewActionRule) -> rusqlite::Result<A
             new.filter_skip_no_avatar as i64,
             new.reaction_type,
             sequence_steps,
+            new.active_hours_start,
+            new.active_hours_end,
+            active_days,
             now,
         ],
     )?;

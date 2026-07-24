@@ -171,6 +171,9 @@ pub fn export_bundle(conn: &Connection) -> rusqlite::Result<BackupBundle> {
                 filter_skip_no_avatar: r.filter_skip_no_avatar,
                 reaction_type: r.reaction_type,
                 sequence_steps: r.sequence_steps,
+                active_hours_start: r.active_hours_start,
+                active_hours_end: r.active_hours_end,
+                active_days: r.active_days,
             },
         })
         .collect();
@@ -205,6 +208,9 @@ pub fn export_bundle(conn: &Connection) -> rusqlite::Result<BackupBundle> {
                 dm_message: r.dm_message,
                 filter_skip_no_avatar: r.filter_skip_no_avatar,
                 reaction_type: r.reaction_type,
+                active_hours_start: r.active_hours_start,
+                active_hours_end: r.active_hours_end,
+                active_days: r.active_days,
             },
         })
         .collect();
@@ -328,6 +334,9 @@ pub fn import_bundle(
             filter_skip_no_avatar: r.new.filter_skip_no_avatar,
             reaction_type: r.new.reaction_type.clone(),
             sequence_steps: r.new.sequence_steps.clone(),
+            active_hours_start: r.new.active_hours_start,
+            active_hours_end: r.new.active_hours_end,
+            active_days: r.new.active_days.clone(),
         };
         let created = db::insert_rule(&tx, &new_rule)?;
         if !r.enabled {
@@ -361,6 +370,9 @@ pub fn import_bundle(
             dm_message: cr.new.dm_message.clone(),
             filter_skip_no_avatar: cr.new.filter_skip_no_avatar,
             reaction_type: cr.new.reaction_type.clone(),
+            active_hours_start: cr.new.active_hours_start,
+            active_hours_end: cr.new.active_hours_end,
+            active_days: cr.new.active_days.clone(),
         };
         db::insert_campaign_rule(&tx, &new_cr)?;
         campaign_rules_count += 1;
@@ -513,6 +525,9 @@ pub fn import_profiles_bundle(
             filter_skip_no_avatar: r.new.filter_skip_no_avatar,
             reaction_type: r.new.reaction_type.clone(),
             sequence_steps: r.new.sequence_steps.clone(),
+            active_hours_start: r.new.active_hours_start,
+            active_hours_end: r.new.active_hours_end,
+            active_days: r.new.active_days.clone(),
         };
         let created = db::insert_rule(&tx, &new_rule)?;
         if !r.enabled {
@@ -583,6 +598,9 @@ pub fn import_campaigns_bundle(
             dm_message: cr.new.dm_message.clone(),
             filter_skip_no_avatar: cr.new.filter_skip_no_avatar,
             reaction_type: cr.new.reaction_type.clone(),
+            active_hours_start: cr.new.active_hours_start,
+            active_hours_end: cr.new.active_hours_end,
+            active_days: cr.new.active_days.clone(),
         };
         db::insert_campaign_rule(&tx, &new_cr)?;
         campaign_rules_count += 1;

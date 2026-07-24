@@ -37,6 +37,16 @@ const SOURCE_LABEL: Record<SourceType, string> = {
 
 export type RuleFormPayload = Omit<NewActionRule, "profile_id">;
 
+const WEEKDAYS: { day: number; label: string }[] = [
+  { day: 1, label: "Mon" },
+  { day: 2, label: "Tue" },
+  { day: 3, label: "Wed" },
+  { day: 4, label: "Thu" },
+  { day: 5, label: "Fri" },
+  { day: 6, label: "Sat" },
+  { day: 7, label: "Sun" },
+];
+
 export function RuleForm({
   platforms,
   onSubmit,
@@ -63,6 +73,15 @@ export function RuleForm({
   const [sourceSeed, setSourceSeed] = useState("");
   const [daysThreshold, setDaysThreshold] = useState(3);
   const [skipNoAvatar, setSkipNoAvatar] = useState(false);
+
+  const [scheduled, setScheduled] = useState(false);
+  const [hoursStart, setHoursStart] = useState(9);
+  const [hoursEnd, setHoursEnd] = useState(23);
+  const [activeDays, setActiveDays] = useState<number[]>([1, 2, 3, 4, 5, 6, 7]);
+
+  function toggleDay(day: number) {
+    setActiveDays((d) => (d.includes(day) ? d.filter((x) => x !== day) : [...d, day].sort()));
+  }
 
   function addStep() {
     setSequenceSteps((steps) => [...steps, { order: steps.length, delay_hours: 24, message: "" }]);
@@ -116,6 +135,9 @@ export function RuleForm({
       filter_skip_no_avatar: skipNoAvatar,
       reaction_type: reactionType,
       sequence_steps: actionType === "dm_sequence" ? sequenceSteps.filter((s) => s.message.trim()) : [],
+      active_hours_start: scheduled ? hoursStart : 0,
+      active_hours_end: scheduled ? hoursEnd : 24,
+      active_days: scheduled ? activeDays : [1, 2, 3, 4, 5, 6, 7],
     };
 
     try {
@@ -282,6 +304,55 @@ export function RuleForm({
           </button>
         </div>
       )}
+
+      <div className="schedule-editor">
+        <label className="hint">
+          <input type="checkbox" checked={scheduled} onChange={(e) => setScheduled(e.target.checked)} />{" "}
+          Restrict to a schedule (working hours + weekdays)
+        </label>
+        {scheduled && (
+          <>
+            <div className="row">
+              <label className="hint">
+                Active from hour
+                <br />
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={hoursStart}
+                  onChange={(e) => setHoursStart(Number(e.target.value))}
+                />
+              </label>
+              <label className="hint">
+                to hour (exclusive, 24 = midnight)
+                <br />
+                <input
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={hoursEnd}
+                  onChange={(e) => setHoursEnd(Number(e.target.value))}
+                />
+              </label>
+            </div>
+            <div className="row">
+              {WEEKDAYS.map((w) => (
+                <label className="hint" key={w.day}>
+                  <input
+                    type="checkbox"
+                    checked={activeDays.includes(w.day)}
+                    onChange={() => toggleDay(w.day)}
+                  />{" "}
+                  {w.label}
+                </label>
+              ))}
+            </div>
+            <p className="hint">Uses this machine's local time. Outside the window the rule sleeps.</p>
+          </>
+        )}
+      </div>
+
       <button type="submit" className="primary">
         {submitLabel}
       </button>

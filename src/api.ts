@@ -116,6 +116,9 @@ export type ActionRule = {
   filter_skip_no_avatar: boolean;
   reaction_type: string;
   sequence_steps: DmSequenceStep[];
+  active_hours_start: number;
+  active_hours_end: number;
+  active_days: number[];
   created_at: string;
 };
 
@@ -133,6 +136,9 @@ export type NewActionRule = {
   filter_skip_no_avatar: boolean;
   reaction_type: string;
   sequence_steps: DmSequenceStep[];
+  active_hours_start: number;
+  active_hours_end: number;
+  active_days: number[];
 };
 
 export type PostMetrics = {
@@ -232,6 +238,9 @@ export type CampaignRule = {
   dm_message: string;
   filter_skip_no_avatar: boolean;
   reaction_type: string;
+  active_hours_start: number;
+  active_hours_end: number;
+  active_days: number[];
   created_at: string;
 };
 
@@ -248,6 +257,9 @@ export type NewCampaignRule = {
   dm_message: string;
   filter_skip_no_avatar: boolean;
   reaction_type: string;
+  active_hours_start: number;
+  active_hours_end: number;
+  active_days: number[];
 };
 
 export type EnrollResult = {

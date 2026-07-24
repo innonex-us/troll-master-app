@@ -325,6 +325,13 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     add_column_if_missing(conn, "campaign_rules", "reaction_type", "TEXT NOT NULL DEFAULT 'like'")?;
     add_column_if_missing(conn, "action_rules", "sequence_steps", "TEXT NOT NULL DEFAULT '[]'")?;
     add_column_if_missing(conn, "profiles", "enabled", "INTEGER NOT NULL DEFAULT 1")?;
+    // Per-rule active-window scheduling (working hours + weekdays). Window is [start,end);
+    // 0..24 = always on. active_days is a JSON array of weekday ints (Mon=1..Sun=7).
+    for table in ["action_rules", "campaign_rules"] {
+        add_column_if_missing(conn, table, "active_hours_start", "INTEGER NOT NULL DEFAULT 0")?;
+        add_column_if_missing(conn, table, "active_hours_end", "INTEGER NOT NULL DEFAULT 24")?;
+        add_column_if_missing(conn, table, "active_days", "TEXT NOT NULL DEFAULT '[1,2,3,4,5,6,7]'")?;
+    }
     Ok(())
 }
 
