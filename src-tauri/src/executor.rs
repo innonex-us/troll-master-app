@@ -434,6 +434,61 @@ pub struct ActionOutcome {
     pub message: String,
 }
 
+/// Publishes a scheduled post (media + caption) for a profile via the sidecar's
+/// best-effort per-platform composer automation. Returns the outcome status/message.
+pub async fn publish_post(
+    state: &AppState,
+    profile: &Profile,
+    media_path: &str,
+    caption: &str,
+) -> ActionOutcome {
+    let enc_path = match &profile.storage_state_enc_path {
+        Some(p) => Path::new(p).to_path_buf(),
+        None => {
+            return ActionOutcome {
+                status: "error".to_string(),
+                message: "profile has no captured login session".to_string(),
+            }
+        }
+    };
+
+    let tmp_path = storage::tmp_plain_path(&state.app_data_dir, &profile.id);
+    if let Err(e) = crypto::decrypt_to_file(&enc_path, &tmp_path) {
+        return ActionOutcome {
+            status: "error".to_string(),
+            message: format!("failed to decrypt session: {e}"),
+        };
+    }
+
+    let proxy = load_proxy(&state.db, profile);
+    let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
+    let call_result = client
+        .call(
+            "post.publish",
+            json!({
+                "platform": profile.platform,
+                "mediaPath": media_path,
+                "caption": caption,
+                "proxy": proxy_json(&proxy),
+                "fingerprint": fingerprint_json(profile),
+                "storageStatePlainPath": tmp_path.to_string_lossy(),
+            }),
+        )
+        .await;
+
+    if tmp_path.exists() {
+        let _ = crypto::encrypt_file(&tmp_path, &enc_path);
+    }
+
+    match call_result {
+        Ok(value) => ActionOutcome {
+            status: value.get("status").and_then(|v| v.as_str()).unwrap_or("error").to_string(),
+            message: value.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        },
+        Err(e) => ActionOutcome { status: "error".to_string(), message: e },
+    }
+}
+
 /// Runs a single automated action (follow/unfollow/like/comment) for a profile against a target.
 pub async fn run_action(
     state: &AppState,

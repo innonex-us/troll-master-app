@@ -11,6 +11,7 @@ mod monitoring;
 mod pods;
 mod profile_stats;
 mod profiles;
+mod scheduled_posts;
 mod proxies;
 mod rules;
 mod settings;
@@ -29,6 +30,7 @@ pub use monitoring::*;
 pub use pods::*;
 pub use profile_stats::*;
 pub use profiles::*;
+pub use scheduled_posts::*;
 pub use proxies::*;
 pub use rules::*;
 pub use settings::*;
@@ -295,9 +297,22 @@ CREATE TABLE IF NOT EXISTS profile_stats (
     captured_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS scheduled_posts (
+    id TEXT PRIMARY KEY,
+    profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    media_path TEXT NOT NULL DEFAULT '',
+    caption TEXT NOT NULL DEFAULT '',
+    scheduled_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    posted_at TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_action_log_profile_type ON action_log(profile_id, action_type, executed_at);
 CREATE INDEX IF NOT EXISTS idx_known_followers_unwelcomed ON known_followers(profile_id, welcomed);
 CREATE INDEX IF NOT EXISTS idx_profile_stats_profile ON profile_stats(profile_id, captured_at);
+CREATE INDEX IF NOT EXISTS idx_scheduled_posts_due ON scheduled_posts(status, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_mpc_unreplied ON monitored_post_comments(monitored_post_id, replied);
 CREATE INDEX IF NOT EXISTS idx_dm_seq_due ON dm_sequence_progress(rule_id, status, next_send_at);
 CREATE INDEX IF NOT EXISTS idx_pod_posts_active ON pod_posts(pod_id, expires_at);

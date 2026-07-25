@@ -695,6 +695,29 @@ pub async fn import_cookies_cmd(
 }
 
 #[tauri::command]
+pub async fn list_scheduled_posts_cmd(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<db::ScheduledPost>, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::list_scheduled_posts(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn create_scheduled_post_cmd(
+    state: State<'_, Arc<AppState>>,
+    new_post: db::NewScheduledPost,
+) -> Result<db::ScheduledPost, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::insert_scheduled_post(&conn, &new_post).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_scheduled_post_cmd(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
+    let conn = state.db.0.lock().unwrap();
+    db::delete_scheduled_post(&conn, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn list_profile_stats_cmd(
     state: State<'_, Arc<AppState>>,
     profile_id: String,

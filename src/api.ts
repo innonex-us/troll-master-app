@@ -205,6 +205,25 @@ export type AppSettings = {
   max_pending_follows: number;
 };
 
+export type ScheduledPost = {
+  id: string;
+  profile_id: string;
+  media_path: string;
+  caption: string;
+  scheduled_at: string;
+  status: string;
+  posted_at: string | null;
+  error: string | null;
+  created_at: string;
+};
+
+export type NewScheduledPost = {
+  profile_id: string;
+  media_path: string;
+  caption: string;
+  scheduled_at: string;
+};
+
 export type ProfileStat = {
   id: string;
   profile_id: string;
@@ -404,6 +423,10 @@ export const api = {
   duplicateProfile: (id: string) => invoke<Profile>("duplicate_profile_cmd", { id }),
   listProfileStats: (profileId: string, limit: number) =>
     invoke<ProfileStat[]>("list_profile_stats_cmd", { profileId, limit }),
+  listScheduledPosts: () => invoke<ScheduledPost[]>("list_scheduled_posts_cmd"),
+  createScheduledPost: (newPost: NewScheduledPost) =>
+    invoke<ScheduledPost>("create_scheduled_post_cmd", { newPost }),
+  deleteScheduledPost: (id: string) => invoke<void>("delete_scheduled_post_cmd", { id }),
   getWelcomeDmConfig: (profileId: string) =>
     invoke<WelcomeDmConfig | null>("get_welcome_dm_config_cmd", { profileId }),
   upsertWelcomeDmConfig: (config: NewWelcomeDmConfig) =>

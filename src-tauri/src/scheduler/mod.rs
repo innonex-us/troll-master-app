@@ -135,8 +135,59 @@ pub fn spawn(app_handle: AppHandle, state: Arc<AppState>) {
             tick_pods(&app_handle, &state, tick_interval_secs).await;
             tick_welcome_dms(&app_handle, &state, tick_interval_secs).await;
             tick_profile_stats(&state).await;
+            tick_publisher(&app_handle, &state).await;
         }
     });
+}
+
+/// Publishes scheduled posts whose time has arrived. One post per tick keeps
+/// concurrent browser sessions down; failures are recorded on the row.
+async fn tick_publisher(app_handle: &AppHandle, state: &Arc<AppState>) {
+    let due = {
+        let conn = state.db.0.lock().unwrap();
+        db::list_due_posts(&conn).unwrap_or_default()
+    };
+
+    let Some(post) = due.into_iter().next() else { return };
+
+    let profile = {
+        let conn = state.db.0.lock().unwrap();
+        match db::get_profile(&conn, &post.profile_id) {
+            Ok(Some(p)) if p.status == "active" && p.enabled => p,
+            _ => {
+                // profile unusable — fail the post so it doesn't retry forever
+                let conn2 = state.db.0.lock().unwrap();
+                let _ = db::mark_post_failed(&conn2, &post.id, "profile inactive/disabled/missing");
+                return;
+            }
+        }
+    };
+
+    let outcome = executor::publish_post(state, &profile, &post.media_path, &post.caption).await;
+
+    {
+        let conn = state.db.0.lock().unwrap();
+        let _ = db::insert_log(&conn, &profile.id, "publish", &post.caption, &outcome.status, Some(&outcome.message));
+        match outcome.status.as_str() {
+            "success" => {
+                let _ = db::mark_post_posted(&conn, &post.id);
+            }
+            _ => {
+                let _ = db::mark_post_failed(&conn, &post.id, &outcome.message);
+                if outcome.status == "challenged" || outcome.status == "banned" {
+                    let _ = db::set_profile_status(&conn, &profile.id, &outcome.status);
+                }
+            }
+        }
+    }
+
+    let _ = app_handle.emit(
+        "action-log",
+        serde_json::json!({
+            "profileId": profile.id, "actionType": "publish", "target": post.caption,
+            "status": outcome.status, "message": outcome.message,
+        }),
+    );
 }
 
 /// Auto-refills a target queue in place for hashtag/followers_of/non_followbacks

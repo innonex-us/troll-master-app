@@ -201,3 +201,17 @@ export type OwnStatsResult = OwnStats & {
   status: "success" | "error";
   message: string;
 };
+
+export type PublishPostParams = {
+  platform: Platform;
+  mediaPath: string;
+  caption: string;
+  proxy?: ProxyConfig | null;
+  fingerprint: FingerprintConfig;
+  storageStatePlainPath: string;
+};
+
+export type PublishPostResult = {
+  status: "success" | "error" | "skipped";
+  message: string;
+};
