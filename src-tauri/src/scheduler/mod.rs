@@ -134,6 +134,7 @@ pub fn spawn(app_handle: AppHandle, state: Arc<AppState>) {
             tick_dm_sequences(&app_handle, &state, tick_interval_secs).await;
             tick_pods(&app_handle, &state, tick_interval_secs).await;
             tick_welcome_dms(&app_handle, &state, tick_interval_secs).await;
+            tick_profile_stats(&state).await;
         }
     });
 }
@@ -893,6 +894,47 @@ async fn tick_pods(app_handle: &AppHandle, state: &Arc<AppState>, tick_interval_
                     );
                 }
             }
+        }
+    }
+}
+
+/// Snapshots each active profile's own follower/following/post counts about once
+/// a day for the growth-analytics graphs. Skips profiles snapshotted in the last
+/// ~20 hours so it settles to one sample per day regardless of tick interval.
+async fn tick_profile_stats(state: &Arc<AppState>) {
+    let profiles = {
+        let conn = state.db.0.lock().unwrap();
+        match db::list_profiles(&conn) {
+            Ok(p) => p,
+            Err(_) => return,
+        }
+    };
+
+    for profile in profiles {
+        if profile.status != "active" || !profile.enabled {
+            continue;
+        }
+        let due = {
+            let conn = state.db.0.lock().unwrap();
+            match db::latest_stat_at(&conn, &profile.id) {
+                Ok(Some(last)) => match chrono::DateTime::parse_from_rfc3339(&last) {
+                    Ok(t) => (Utc::now() - t.with_timezone(&Utc)).num_hours() >= 20,
+                    Err(_) => true,
+                },
+                Ok(None) => true,
+                Err(_) => false,
+            }
+        };
+        if !due {
+            continue;
+        }
+
+        match executor::fetch_own_stats(state, &profile).await {
+            Ok(stats) => {
+                let conn = state.db.0.lock().unwrap();
+                let _ = db::insert_stat(&conn, &profile.id, stats.followers, stats.following, stats.posts);
+            }
+            Err(e) => eprintln!("[scheduler] profile-stats scrape failed for {}: {e}", profile.username),
         }
     }
 }

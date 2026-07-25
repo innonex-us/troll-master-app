@@ -180,3 +180,16 @@ export type OwnPostResult = {
   url: string | null;
   message: string;
 };
+
+export type OwnStatsParams = OwnPostParams;
+
+export type OwnStats = {
+  followers: number | null;
+  following: number | null;
+  posts: number | null;
+};
+
+export type OwnStatsResult = OwnStats & {
+  status: "success" | "error";
+  message: string;
+};

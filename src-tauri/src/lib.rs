@@ -130,6 +130,7 @@ pub fn run() {
             commands::clear_profile_password_cmd,
             commands::auto_login_cmd,
             commands::import_cookies_cmd,
+            commands::list_profile_stats_cmd,
             commands::get_welcome_dm_config_cmd,
             commands::upsert_welcome_dm_config_cmd,
             commands::export_backup_cmd,

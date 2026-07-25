@@ -8,6 +8,7 @@ import { PodsPage } from "./pages/PodsPage";
 import { ProxiesPage } from "./pages/ProxiesPage";
 import { MonitorPage } from "./pages/MonitorPage";
 import { ToolsPage } from "./pages/ToolsPage";
+import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { LogsPage } from "./pages/LogsPage";
 import { BlacklistPage } from "./pages/BlacklistPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -24,6 +25,7 @@ type Tab =
   | "proxies"
   | "monitor"
   | "tools"
+  | "analytics"
   | "blacklist"
   | "logs"
   | "settings"
@@ -37,6 +39,7 @@ const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: "proxies", label: "Proxies", icon: "◈" },
   { id: "monitor", label: "Monitor", icon: "◉" },
   { id: "tools", label: "Tools", icon: "⚒" },
+  { id: "analytics", label: "Analytics", icon: "▤" },
   { id: "blacklist", label: "Blacklist", icon: "⊘" },
   { id: "logs", label: "Logs", icon: "≡" },
   { id: "changelog", label: "Changelog", icon: "↻" },
@@ -113,6 +116,7 @@ function App() {
         {tab === "proxies" && <ProxiesPage />}
         {tab === "monitor" && <MonitorPage />}
         {tab === "tools" && <ToolsPage />}
+        {tab === "analytics" && <AnalyticsPage />}
         {tab === "blacklist" && <BlacklistPage />}
         {tab === "logs" && <LogsPage />}
         {tab === "changelog" && <ChangelogPage />}

@@ -70,3 +70,11 @@ export async function scrapeLatestOwnPost(page: Page, username: string): Promise
     .catch(() => null);
   return href ? href.split("?")[0] : null;
 }
+
+import type { OwnStats as OwnStats_linkedin } from "../../engine/types.js";
+
+/** linkedin doesn't reliably expose own follower/following counts to scraping — returns
+ * nulls (best-effort placeholder so analytics still records a row). */
+export async function scrapeOwnStats(_page: Page, _username: string): Promise<OwnStats_linkedin> {
+  return { followers: null, following: null, posts: null };
+}

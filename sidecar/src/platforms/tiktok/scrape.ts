@@ -72,3 +72,22 @@ export async function scrapeLatestOwnPost(page: Page, username: string): Promise
     .catch(() => null);
   return href ?? null;
 }
+
+import { parseCount as parseCountTt } from "../../engine/parse-count.js";
+import type { OwnStats as OwnStatsTt } from "../../engine/types.js";
+
+/** Follower/following counts from TikTok's data-e2e profile counters. */
+export async function scrapeOwnStats(page: Page, username: string): Promise<OwnStatsTt> {
+  const handle = username.replace(/^@/, "");
+  await page.goto(`${tiktokConfig.baseUrl}/@${handle}`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1200);
+  async function n(sel: string) {
+    const t = await page.locator(sel).first().innerText().catch(() => null);
+    return parseCountTt(t ?? undefined);
+  }
+  return {
+    followers: await n('[data-e2e="followers-count"]'),
+    following: await n('[data-e2e="following-count"]'),
+    posts: null,
+  };
+}

@@ -9,6 +9,7 @@ mod groups;
 mod logs;
 mod monitoring;
 mod pods;
+mod profile_stats;
 mod profiles;
 mod proxies;
 mod rules;
@@ -26,6 +27,7 @@ pub use groups::*;
 pub use logs::*;
 pub use monitoring::*;
 pub use pods::*;
+pub use profile_stats::*;
 pub use profiles::*;
 pub use proxies::*;
 pub use rules::*;
@@ -284,8 +286,18 @@ CREATE TABLE IF NOT EXISTS welcome_dm_config (
     seeded INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS profile_stats (
+    id TEXT PRIMARY KEY,
+    profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    followers INTEGER,
+    following INTEGER,
+    posts INTEGER,
+    captured_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_action_log_profile_type ON action_log(profile_id, action_type, executed_at);
 CREATE INDEX IF NOT EXISTS idx_known_followers_unwelcomed ON known_followers(profile_id, welcomed);
+CREATE INDEX IF NOT EXISTS idx_profile_stats_profile ON profile_stats(profile_id, captured_at);
 CREATE INDEX IF NOT EXISTS idx_mpc_unreplied ON monitored_post_comments(monitored_post_id, replied);
 CREATE INDEX IF NOT EXISTS idx_dm_seq_due ON dm_sequence_progress(rule_id, status, next_send_at);
 CREATE INDEX IF NOT EXISTS idx_pod_posts_active ON pod_posts(pod_id, expires_at);

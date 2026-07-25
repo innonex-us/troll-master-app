@@ -71,3 +71,11 @@ export async function scrapeLatestOwnPost(page: Page, username: string): Promise
     .catch(() => null);
   return href ?? null;
 }
+
+import type { OwnStats as OwnStats_facebook } from "../../engine/types.js";
+
+/** facebook doesn't reliably expose own follower/following counts to scraping — returns
+ * nulls (best-effort placeholder so analytics still records a row). */
+export async function scrapeOwnStats(_page: Page, _username: string): Promise<OwnStats_facebook> {
+  return { followers: null, following: null, posts: null };
+}

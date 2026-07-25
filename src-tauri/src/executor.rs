@@ -378,6 +378,57 @@ pub async fn fetch_latest_own_post(state: &AppState, member_profile: &Profile) -
     Ok(value.get("url").and_then(|v| v.as_str()).map(|s| s.to_string()))
 }
 
+pub struct OwnStats {
+    pub followers: Option<i64>,
+    pub following: Option<i64>,
+    pub posts: Option<i64>,
+}
+
+/// Snapshots a profile's own follower/following/post counts for growth analytics.
+/// Best-effort per platform (some return all-null).
+pub async fn fetch_own_stats(state: &AppState, profile: &Profile) -> Result<OwnStats, String> {
+    let enc_path = match &profile.storage_state_enc_path {
+        Some(p) => Path::new(p).to_path_buf(),
+        None => return Err("profile has no captured login session".to_string()),
+    };
+
+    let tmp_path = storage::tmp_plain_path(&state.app_data_dir, &profile.id);
+    crypto::decrypt_to_file(&enc_path, &tmp_path).map_err(|e| e.to_string())?;
+
+    let proxy = load_proxy(&state.db, profile);
+    let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
+    let call_result = client
+        .call(
+            "own.stats",
+            json!({
+                "platform": profile.platform,
+                "username": profile.username,
+                "proxy": proxy_json(&proxy),
+                "fingerprint": fingerprint_json(profile),
+                "storageStatePlainPath": tmp_path.to_string_lossy(),
+            }),
+        )
+        .await;
+
+    if tmp_path.exists() {
+        let _ = crypto::encrypt_file(&tmp_path, &enc_path);
+    }
+
+    let value = call_result?;
+    let status = value.get("status").and_then(|v| v.as_str()).unwrap_or("error");
+    if status != "success" {
+        let message = value.get("message").and_then(|v| v.as_str()).unwrap_or("scrape failed").to_string();
+        return Err(message);
+    }
+
+    let getn = |k: &str| value.get(k).and_then(|v| v.as_i64());
+    Ok(OwnStats {
+        followers: getn("followers"),
+        following: getn("following"),
+        posts: getn("posts"),
+    })
+}
+
 pub struct ActionOutcome {
     pub status: String,
     pub message: String,

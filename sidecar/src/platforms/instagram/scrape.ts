@@ -76,3 +76,24 @@ export async function scrapeLatestOwnPost(page: Page, username: string): Promise
   const href = await page.locator('a[href^="/p/"], a[href^="/reel/"]').first().getAttribute("href").catch(() => null);
   return href ? `${instagramConfig.baseUrl}${href}` : null;
 }
+
+import { parseCount } from "../../engine/parse-count.js";
+import type { OwnStats } from "../../engine/types.js";
+
+/** Reads follower/following/post counts for the logged-in account from its own
+ * profile page. Instagram populates og:description like
+ * "1,234 Followers, 567 Following, 89 Posts - ...". Best-effort. */
+export async function scrapeOwnStats(page: Page, username: string): Promise<OwnStats> {
+  const handle = username.replace(/^@/, "");
+  await page.goto(`${instagramConfig.baseUrl}/${handle}/`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1000);
+  const content = await page
+    .locator('meta[property="og:description"]')
+    .getAttribute("content")
+    .catch(() => null);
+  if (!content) return { followers: null, following: null, posts: null };
+  const followers = parseCount(content.match(/([\d,.]+[KMB]?)\s+Followers/i)?.[1]);
+  const following = parseCount(content.match(/([\d,.]+[KMB]?)\s+Following/i)?.[1]);
+  const posts = parseCount(content.match(/([\d,.]+[KMB]?)\s+Posts/i)?.[1]);
+  return { followers, following, posts };
+}

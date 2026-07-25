@@ -68,3 +68,28 @@ export async function scrapeLatestOwnPost(page: Page, username: string): Promise
     .catch(() => null);
   return href ? `${twitterConfig.baseUrl}${href}` : null;
 }
+
+import { parseCount as parseCountTw } from "../../engine/parse-count.js";
+import type { OwnStats as OwnStatsTw } from "../../engine/types.js";
+
+/** Best-effort follower/following counts from the profile header links. */
+export async function scrapeOwnStats(page: Page, username: string): Promise<OwnStatsTw> {
+  const handle = username.replace(/^@/, "");
+  await page.goto(`${twitterConfig.baseUrl}/${handle}`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1200);
+  const followersText = await page
+    .locator(`a[href$="/verified_followers"], a[href$="/followers"]`)
+    .first()
+    .innerText()
+    .catch(() => null);
+  const followingText = await page
+    .locator(`a[href$="/following"]`)
+    .first()
+    .innerText()
+    .catch(() => null);
+  return {
+    followers: parseCountTw(followersText?.match(/([\d,.]+[KMB]?)/)?.[1]),
+    following: parseCountTw(followingText?.match(/([\d,.]+[KMB]?)/)?.[1]),
+    posts: null,
+  };
+}

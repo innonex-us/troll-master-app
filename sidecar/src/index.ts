@@ -4,12 +4,14 @@ import { runAction } from "./engine/action-runner.js";
 import { runScrape } from "./engine/scrape-runner.js";
 import { runMonitorScrape } from "./engine/monitor-runner.js";
 import { runOwnLatestPost } from "./engine/own-post-runner.js";
+import { runOwnStats } from "./engine/own-stats-runner.js";
 import type {
   ActionRunParams,
   AutoLoginParams,
   LoginCaptureParams,
   MonitorParams,
   OwnPostParams,
+  OwnStatsParams,
   ScrapeParams,
 } from "./engine/types.js";
 
@@ -39,6 +41,10 @@ registerHandler("monitor.scrapeMetrics", (params) => {
 
 registerHandler("own.latestPost", (params) => {
   return runOwnLatestPost(params as OwnPostParams);
+});
+
+registerHandler("own.stats", (params) => {
+  return runOwnStats(params as OwnStatsParams);
 });
 
 startRpcServer();

@@ -202,6 +202,15 @@ export type AppSettings = {
   max_pending_follows: number;
 };
 
+export type ProfileStat = {
+  id: string;
+  profile_id: string;
+  followers: number | null;
+  following: number | null;
+  posts: number | null;
+  captured_at: string;
+};
+
 export type WelcomeDmConfig = {
   profile_id: string;
   enabled: boolean;
@@ -390,6 +399,8 @@ export const api = {
   setProfileEnabled: (id: string, enabled: boolean) =>
     invoke<void>("set_profile_enabled_cmd", { id, enabled }),
   duplicateProfile: (id: string) => invoke<Profile>("duplicate_profile_cmd", { id }),
+  listProfileStats: (profileId: string, limit: number) =>
+    invoke<ProfileStat[]>("list_profile_stats_cmd", { profileId, limit }),
   getWelcomeDmConfig: (profileId: string) =>
     invoke<WelcomeDmConfig | null>("get_welcome_dm_config_cmd", { profileId }),
   upsertWelcomeDmConfig: (config: NewWelcomeDmConfig) =>

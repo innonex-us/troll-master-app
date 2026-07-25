@@ -695,6 +695,16 @@ pub async fn import_cookies_cmd(
 }
 
 #[tauri::command]
+pub async fn list_profile_stats_cmd(
+    state: State<'_, Arc<AppState>>,
+    profile_id: String,
+    limit: i64,
+) -> Result<Vec<db::ProfileStat>, String> {
+    let conn = state.db.0.lock().unwrap();
+    db::list_stats(&conn, &profile_id, limit).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_welcome_dm_config_cmd(
     state: State<'_, Arc<AppState>>,
     profile_id: String,
