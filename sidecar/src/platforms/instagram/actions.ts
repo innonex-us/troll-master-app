@@ -178,3 +178,39 @@ export async function dm(page: Page, username: string, message: string): Promise
   await page.waitForTimeout(1200);
   return { status: "success", message: `sent DM to ${username}` };
 }
+
+/** Best-effort block: opens the profile's options menu and confirms Block. */
+export async function block(page: Page, username: string): Promise<ActionResult> {
+  await page.goto(profileUrl(username), { waitUntil: "domcontentloaded" });
+  const opts = page.locator('svg[aria-label="Options"]').first();
+  if (!(await opts.isVisible().catch(() => false))) {
+    return { status: "error", message: `options menu not found for ${username}` };
+  }
+  await opts.click();
+  const blockItem = page.getByRole("button", { name: /^Block$/i }).first();
+  if (!(await blockItem.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false))) {
+    return { status: "skipped", message: `block option not available for ${username}` };
+  }
+  await blockItem.click();
+  const confirm = page.getByRole("button", { name: /^Block$/i }).last();
+  await confirm.click().catch(() => {});
+  await page.waitForTimeout(1000);
+  return { status: "success", message: `blocked ${username}` };
+}
+
+/** Best-effort mute (posts + stories) from the Following menu on the profile. */
+export async function mute(page: Page, username: string): Promise<ActionResult> {
+  await page.goto(profileUrl(username), { waitUntil: "domcontentloaded" });
+  const following = page.getByRole("button", { name: /Following|Requested/ }).first();
+  if (!(await following.isVisible().catch(() => false))) {
+    return { status: "skipped", message: `not following ${username}, cannot mute` };
+  }
+  await following.click();
+  const muteItem = page.getByRole("button", { name: /^Mute$/i }).first();
+  if (!(await muteItem.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false))) {
+    return { status: "skipped", message: `mute option not available for ${username}` };
+  }
+  await muteItem.click();
+  await page.waitForTimeout(800);
+  return { status: "success", message: `opened mute options for ${username}` };
+}

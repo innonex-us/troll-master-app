@@ -100,3 +100,23 @@ export async function dm(page: Page, target: string, message: string): Promise<A
   await page.waitForTimeout(1200);
   return { status: "success", message: `sent message to ${target}` };
 }
+
+/** Best-effort block from the profile's "..." menu. Facebook's block flow is
+ * multi-step and heavily obfuscated — this is a best-effort attempt. */
+export async function block(page: Page, target: string): Promise<ActionResult> {
+  await page.goto(profileUrl(target), { waitUntil: "domcontentloaded" });
+  const more = page.getByRole("button", { name: /^More$/ }).first();
+  if (!(await more.isVisible().catch(() => false))) {
+    return { status: "error", message: `more menu not found for ${target}` };
+  }
+  await more.click();
+  const blockItem = page.getByRole("menuitem", { name: /Block/i }).first();
+  if (!(await blockItem.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false))) {
+    return { status: "skipped", message: `block option not available for ${target}` };
+  }
+  await blockItem.click();
+  const confirm = page.getByRole("button", { name: /^Block$/i }).last();
+  await confirm.click().catch(() => {});
+  await page.waitForTimeout(1200);
+  return { status: "success", message: `blocked ${target}` };
+}

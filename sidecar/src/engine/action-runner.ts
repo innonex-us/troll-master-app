@@ -59,6 +59,10 @@ async function dispatchInstagram(page: Page, params: ActionRunParams): Promise<A
       return instagram.dm(page, params.target, pickDmMessage(params.dmMessage));
     case "reply_comment":
       return instagram.comment(page, postUrlFromReplyTarget(params.target), pickComment(params.commentPool));
+    case "block":
+      return instagram.block(page, params.target);
+    case "mute":
+      return instagram.mute(page, params.target);
     default:
       return { status: "error", message: `unsupported Instagram action: ${params.actionType}` };
   }
@@ -84,6 +88,10 @@ async function dispatchTwitter(page: Page, params: ActionRunParams): Promise<Act
       return twitter.dm(page, params.target, pickDmMessage(params.dmMessage));
     case "reply_comment":
       return twitter.comment(page, postUrlFromReplyTarget(params.target), pickComment(params.commentPool));
+    case "block":
+      return twitter.block(page, params.target);
+    case "mute":
+      return twitter.mute(page, params.target);
     default:
       return { status: "error", message: `unsupported X/Twitter action: ${params.actionType}` };
   }
@@ -105,6 +113,8 @@ async function dispatchFacebook(page: Page, params: ActionRunParams): Promise<Ac
       return facebook.dm(page, params.target, pickDmMessage(params.dmMessage));
     case "reply_comment":
       return facebook.comment(page, postUrlFromReplyTarget(params.target), pickComment(params.commentPool));
+    case "block":
+      return facebook.block(page, params.target);
     default:
       return { status: "error", message: `unsupported Facebook action: ${params.actionType}` };
   }
@@ -150,6 +160,10 @@ async function dispatchTiktok(page: Page, params: ActionRunParams): Promise<Acti
       return tiktok.dm(page, params.target, pickDmMessage(params.dmMessage));
     case "reply_comment":
       return tiktok.comment(page, postUrlFromReplyTarget(params.target), pickComment(params.commentPool));
+    case "block":
+      return tiktok.block(page, params.target);
+    case "watch_video":
+      return tiktok.watchVideo(page, params.target);
     default:
       return { status: "error", message: `unsupported TikTok action: ${params.actionType}` };
   }
@@ -196,6 +210,8 @@ async function dispatchYoutube(page: Page, params: ActionRunParams): Promise<Act
       return youtube.dm(page, params.target, pickDmMessage(params.dmMessage));
     case "reply_comment":
       return youtube.comment(page, postUrlFromReplyTarget(params.target), pickComment(params.commentPool));
+    case "watch_video":
+      return youtube.watchVideo(page, params.target);
     default:
       return { status: "error", message: `unsupported YouTube action: ${params.actionType}` };
   }

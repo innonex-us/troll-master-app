@@ -150,3 +150,29 @@ export async function dm(page: Page, target: string, message: string): Promise<A
   await page.waitForTimeout(1200);
   return { status: "success", message: `sent message to ${target}` };
 }
+
+/** Best-effort block from the profile's share/more menu. */
+export async function block(page: Page, target: string): Promise<ActionResult> {
+  await page.goto(profileUrl(target), { waitUntil: "domcontentloaded" });
+  const more = page.locator('[data-e2e="user-more"], [data-e2e="user-share"]').first();
+  if (!(await more.isVisible().catch(() => false))) {
+    return { status: "error", message: `more menu not found for ${target}` };
+  }
+  await more.click();
+  const blockItem = page.getByText(/^Block$/i).first();
+  if (!(await blockItem.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false))) {
+    return { status: "skipped", message: `block option not available for ${target}` };
+  }
+  await blockItem.click();
+  const confirm = page.getByRole("button", { name: /^Block$/i }).last();
+  await confirm.click().catch(() => {});
+  await page.waitForTimeout(1000);
+  return { status: "success", message: `blocked ${target}` };
+}
+
+/** Views a video for a realistic dwell time. */
+export async function watchVideo(page: Page, videoUrl: string): Promise<ActionResult> {
+  await page.goto(videoUrl, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(8000 + Math.floor(Math.random() * 12000));
+  return { status: "success", message: `watched ${videoUrl}` };
+}

@@ -39,7 +39,9 @@ export type InstagramActionType =
   | "save"
   | "view_story"
   | "react_story"
-  | "reply_comment";
+  | "reply_comment"
+  | "block"
+  | "mute";
 
 export type TwitterActionType =
   | "follow"
@@ -50,7 +52,9 @@ export type TwitterActionType =
   | "dm"
   | "retweet"
   | "unretweet"
-  | "reply_comment";
+  | "reply_comment"
+  | "block"
+  | "mute";
 
 export type FacebookActionType =
   | "follow"
@@ -59,7 +63,8 @@ export type FacebookActionType =
   | "unlike"
   | "comment"
   | "dm"
-  | "reply_comment";
+  | "reply_comment"
+  | "block";
 
 export type TiktokActionType =
   | "follow"
@@ -71,7 +76,9 @@ export type TiktokActionType =
   | "save"
   | "view_story"
   | "react_story"
-  | "reply_comment";
+  | "reply_comment"
+  | "block"
+  | "watch_video";
 
 export type LinkedinActionType =
   | "follow"
@@ -91,7 +98,8 @@ export type YoutubeActionType =
   | "dm"
   | "view_story"
   | "react_story"
-  | "reply_comment";
+  | "reply_comment"
+  | "watch_video";
 
 export type ActionRunParams = {
   profileId: string;

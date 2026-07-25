@@ -13,6 +13,9 @@ const ALL_ACTIONS: ActionType[] = [
   "react_story",
   "retweet",
   "unretweet",
+  "block",
+  "mute",
+  "watch_video",
 ];
 
 const SOURCE_LABEL: Record<SourceType, string> = {

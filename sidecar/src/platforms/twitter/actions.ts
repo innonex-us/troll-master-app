@@ -146,3 +146,39 @@ export async function dm(page: Page, username: string, message: string): Promise
   await page.waitForTimeout(1200);
   return { status: "success", message: `sent DM to ${username}` };
 }
+
+/** Best-effort block via the profile's overflow menu. */
+export async function block(page: Page, username: string): Promise<ActionResult> {
+  await page.goto(`${twitterConfig.baseUrl}/${username.replace(/^@/, "")}`, { waitUntil: "domcontentloaded" });
+  const more = page.locator('[data-testid="userActions"], [aria-label="More"]').first();
+  if (!(await more.isVisible().catch(() => false))) {
+    return { status: "error", message: `actions menu not found for ${username}` };
+  }
+  await more.click();
+  const blockItem = page.getByRole("menuitem", { name: /Block @/i }).first();
+  if (!(await blockItem.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false))) {
+    return { status: "skipped", message: `block option not available for ${username}` };
+  }
+  await blockItem.click();
+  const confirm = page.locator('[data-testid="confirmationSheetConfirm"]').first();
+  await confirm.click().catch(() => {});
+  await page.waitForTimeout(1000);
+  return { status: "success", message: `blocked ${username}` };
+}
+
+/** Best-effort mute via the profile's overflow menu. */
+export async function mute(page: Page, username: string): Promise<ActionResult> {
+  await page.goto(`${twitterConfig.baseUrl}/${username.replace(/^@/, "")}`, { waitUntil: "domcontentloaded" });
+  const more = page.locator('[data-testid="userActions"], [aria-label="More"]').first();
+  if (!(await more.isVisible().catch(() => false))) {
+    return { status: "error", message: `actions menu not found for ${username}` };
+  }
+  await more.click();
+  const muteItem = page.getByRole("menuitem", { name: /Mute @/i }).first();
+  if (!(await muteItem.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false))) {
+    return { status: "skipped", message: `mute option not available for ${username}` };
+  }
+  await muteItem.click();
+  await page.waitForTimeout(800);
+  return { status: "success", message: `muted ${username}` };
+}

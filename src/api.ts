@@ -14,7 +14,10 @@ export type ActionType =
   | "reply_comment"
   | "dm_sequence"
   | "retweet"
-  | "unretweet";
+  | "unretweet"
+  | "block"
+  | "mute"
+  | "watch_video";
 
 export type DmSequenceStep = {
   order: number;

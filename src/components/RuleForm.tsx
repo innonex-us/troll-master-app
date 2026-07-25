@@ -2,12 +2,12 @@ import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { ActionType, DmSequenceStep, NewActionRule, Platform, SourceType } from "../api";
 
 export const ACTIONS_BY_PLATFORM: Record<Platform, ActionType[]> = {
-  instagram: ["follow", "unfollow", "like", "unlike", "comment", "save", "view_story", "react_story", "dm", "dm_sequence"],
-  twitter: ["follow", "unfollow", "like", "unlike", "comment", "retweet", "unretweet", "dm", "dm_sequence"],
-  facebook: ["follow", "unfollow", "like", "unlike", "comment", "dm", "dm_sequence"],
-  tiktok: ["follow", "unfollow", "like", "unlike", "comment", "save", "view_story", "react_story", "dm", "dm_sequence"],
+  instagram: ["follow", "unfollow", "like", "unlike", "comment", "save", "view_story", "react_story", "dm", "dm_sequence", "block", "mute"],
+  twitter: ["follow", "unfollow", "like", "unlike", "comment", "retweet", "unretweet", "dm", "dm_sequence", "block", "mute"],
+  facebook: ["follow", "unfollow", "like", "unlike", "comment", "dm", "dm_sequence", "block"],
+  tiktok: ["follow", "unfollow", "like", "unlike", "comment", "save", "view_story", "react_story", "dm", "dm_sequence", "block", "watch_video"],
   linkedin: ["follow", "unfollow", "like", "unlike", "comment", "dm", "dm_sequence"],
-  youtube: ["follow", "unfollow", "like", "unlike", "comment", "view_story", "react_story", "dm", "dm_sequence"],
+  youtube: ["follow", "unfollow", "like", "unlike", "comment", "view_story", "react_story", "dm", "dm_sequence", "watch_video"],
 };
 
 // which non-explicit source(s) make sense for each action, and whether targets are
@@ -26,6 +26,9 @@ const ACTION_META: Record<ActionType, { sources: SourceType[]; targetKind: "user
   reply_comment: { sources: [], targetKind: "url" },
   retweet: { sources: ["hashtag"], targetKind: "url" },
   unretweet: { sources: [], targetKind: "url" },
+  block: { sources: ["followers_of"], targetKind: "username" },
+  mute: { sources: ["followers_of"], targetKind: "username" },
+  watch_video: { sources: ["hashtag"], targetKind: "url" },
 };
 
 const SOURCE_LABEL: Record<SourceType, string> = {

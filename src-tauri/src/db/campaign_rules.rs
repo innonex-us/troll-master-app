@@ -178,21 +178,21 @@ pub fn action_valid_for_platform(action_type: &str, platform: &str) -> bool {
     match platform {
         "instagram" => matches!(
             action_type,
-            "follow" | "unfollow" | "like" | "unlike" | "comment" | "save" | "view_story" | "react_story" | "dm"
+            "follow" | "unfollow" | "like" | "unlike" | "comment" | "save" | "view_story" | "react_story" | "dm" | "block" | "mute"
         ),
         "twitter" => matches!(
             action_type,
-            "follow" | "unfollow" | "like" | "unlike" | "comment" | "retweet" | "unretweet" | "dm"
+            "follow" | "unfollow" | "like" | "unlike" | "comment" | "retweet" | "unretweet" | "dm" | "block" | "mute"
         ),
-        "facebook" => matches!(action_type, "follow" | "unfollow" | "like" | "unlike" | "comment" | "dm"),
+        "facebook" => matches!(action_type, "follow" | "unfollow" | "like" | "unlike" | "comment" | "dm" | "block"),
         "tiktok" => matches!(
             action_type,
-            "follow" | "unfollow" | "like" | "unlike" | "comment" | "save" | "view_story" | "react_story" | "dm"
+            "follow" | "unfollow" | "like" | "unlike" | "comment" | "save" | "view_story" | "react_story" | "dm" | "block" | "watch_video"
         ),
         "linkedin" => matches!(action_type, "follow" | "unfollow" | "like" | "unlike" | "comment" | "dm"),
         "youtube" => matches!(
             action_type,
-            "follow" | "unfollow" | "like" | "unlike" | "comment" | "view_story" | "react_story" | "dm"
+            "follow" | "unfollow" | "like" | "unlike" | "comment" | "view_story" | "react_story" | "dm" | "watch_video"
         ),
         _ => false,
     }

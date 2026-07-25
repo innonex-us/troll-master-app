@@ -155,3 +155,10 @@ export async function dm(page: Page, target: string, message: string): Promise<A
   await page.waitForTimeout(1200);
   return { status: "success", message: `sent message to ${target}` };
 }
+
+/** Opens a video and dwells for a realistic watch time. */
+export async function watchVideo(page: Page, videoUrl: string): Promise<ActionResult> {
+  await page.goto(videoUrl, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(10000 + Math.floor(Math.random() * 20000));
+  return { status: "success", message: `watched ${videoUrl}` };
+}
