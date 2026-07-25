@@ -281,11 +281,57 @@ export function SettingsPage() {
               onChange={(e) => setSettings({ ...settings, max_pending_follows: Number(e.target.value) })}
             />
           </label>
+          <label className="hint">
+            <br />
+            <input
+              type="checkbox"
+              checked={settings.humanize_actions}
+              onChange={(e) => setSettings({ ...settings, humanize_actions: e.target.checked })}
+            />{" "}
+            Humanize actions (idle scroll, mouse drift, think-pauses, human typing)
+          </label>
         </div>
         <button type="submit" className="primary">
           Save Engine Settings
         </button>
         {saveStatus && <p className="hint">{saveStatus}</p>}
+      </form>
+
+      <form className="panel" onSubmit={saveSettings}>
+        <h3>Captcha Solver</h3>
+        <p className="hint">
+          Optional. When a reCAPTCHA appears during login, Troll Master can submit it to a solving
+          service and inject the answer. Best-effort — proprietary/enterprise challenges can't be
+          solved. The API key is stored locally in plaintext (same as proxy credentials).
+        </p>
+        <div className="row">
+          <label className="hint">
+            Provider
+            <br />
+            <select
+              value={settings.captcha_provider}
+              onChange={(e) => setSettings({ ...settings, captcha_provider: e.target.value })}
+            >
+              <option value="">None</option>
+              <option value="2captcha">2Captcha</option>
+              <option value="anticaptcha">Anti-Captcha</option>
+            </select>
+          </label>
+          <label className="hint" style={{ flex: "1 1 260px" }}>
+            API key
+            <br />
+            <input
+              type="password"
+              placeholder="service API key"
+              value={settings.captcha_api_key}
+              onChange={(e) => setSettings({ ...settings, captcha_api_key: e.target.value })}
+              style={{ width: "100%" }}
+            />
+          </label>
+        </div>
+        <button type="submit" className="primary">
+          Save Captcha Settings
+        </button>
       </form>
 
       <form className="panel" onSubmit={changePassword}>

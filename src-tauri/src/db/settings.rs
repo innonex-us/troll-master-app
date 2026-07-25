@@ -25,6 +25,10 @@ pub fn get_bool(conn: &Connection, key: &str, default: bool) -> bool {
     get_raw(conn, key).map(|v| v == "true").unwrap_or(default)
 }
 
+pub fn get_str(conn: &Connection, key: &str, default: &str) -> String {
+    get_raw(conn, key).unwrap_or_else(|| default.to_string())
+}
+
 /// The full settings bundle exposed to (and editable from) the Settings page.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AppSettings {
@@ -42,6 +46,15 @@ pub struct AppSettings {
     /// unfollowed). While a profile is at/over this, its `follow` rules pause until
     /// unfollow rules drain the backlog. `0` = unlimited. Applied live.
     pub max_pending_follows: i64,
+    /// When on, actions add human-like in-page behavior (idle scroll, mouse drift,
+    /// think-time pauses, per-character typing) to look less botlike. Applied live.
+    pub humanize_actions: bool,
+    /// Optional captcha-solving service used during login when a reCAPTCHA appears.
+    /// "" | "2captcha" | "anticaptcha". Applied live (read per login attempt).
+    pub captcha_provider: String,
+    /// API key for the selected captcha provider. Stored locally in plaintext
+    /// (same as proxy credentials); leave blank to disable solving.
+    pub captcha_api_key: String,
 }
 
 impl Default for AppSettings {
@@ -53,6 +66,9 @@ impl Default for AppSettings {
             backoff_cap_hours: 6,
             warmup_enabled: true,
             max_pending_follows: 0,
+            humanize_actions: true,
+            captcha_provider: String::new(),
+            captcha_api_key: String::new(),
         }
     }
 }
@@ -66,6 +82,9 @@ pub fn get_settings(conn: &Connection) -> AppSettings {
         backoff_cap_hours: get_int(conn, "backoff_cap_hours", d.backoff_cap_hours),
         warmup_enabled: get_bool(conn, "warmup_enabled", d.warmup_enabled),
         max_pending_follows: get_int(conn, "max_pending_follows", d.max_pending_follows),
+        humanize_actions: get_bool(conn, "humanize_actions", d.humanize_actions),
+        captcha_provider: get_str(conn, "captcha_provider", &d.captcha_provider),
+        captcha_api_key: get_str(conn, "captcha_api_key", &d.captcha_api_key),
     }
 }
 
@@ -76,6 +95,9 @@ pub fn save_settings(conn: &Connection, s: &AppSettings) -> rusqlite::Result<()>
     set_raw(conn, "backoff_cap_hours", &s.backoff_cap_hours.to_string())?;
     set_raw(conn, "warmup_enabled", if s.warmup_enabled { "true" } else { "false" })?;
     set_raw(conn, "max_pending_follows", &s.max_pending_follows.to_string())?;
+    set_raw(conn, "humanize_actions", if s.humanize_actions { "true" } else { "false" })?;
+    set_raw(conn, "captcha_provider", &s.captcha_provider)?;
+    set_raw(conn, "captcha_api_key", &s.captcha_api_key)?;
     Ok(())
 }
 

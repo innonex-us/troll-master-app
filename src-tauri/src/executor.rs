@@ -67,6 +67,12 @@ pub async fn capture_login(state: &AppState, profile_id: &str) -> Result<(), Str
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
+    let (captcha_provider, captcha_api_key) = {
+        let conn = state.db.0.lock().unwrap();
+        let s = crate::db::get_settings(&conn);
+        (s.captcha_provider, s.captcha_api_key)
+    };
+
     let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
     let result = client
         .call(
@@ -77,6 +83,8 @@ pub async fn capture_login(state: &AppState, profile_id: &str) -> Result<(), Str
                 "proxy": proxy_json(&proxy),
                 "fingerprint": fingerprint_json(&profile),
                 "storageStatePlainPath": tmp_path.to_string_lossy(),
+                "captchaProvider": captcha_provider,
+                "captchaApiKey": captcha_api_key,
             }),
         )
         .await?;
@@ -124,6 +132,12 @@ pub async fn auto_login(state: &AppState, profile_id: &str) -> Result<(), String
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
+    let (captcha_provider, captcha_api_key) = {
+        let conn = state.db.0.lock().unwrap();
+        let s = crate::db::get_settings(&conn);
+        (s.captcha_provider, s.captcha_api_key)
+    };
+
     let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
     let result = client
         .call(
@@ -136,6 +150,8 @@ pub async fn auto_login(state: &AppState, profile_id: &str) -> Result<(), String
                 "proxy": proxy_json(&proxy),
                 "fingerprint": fingerprint_json(&profile),
                 "storageStatePlainPath": tmp_path.to_string_lossy(),
+                "captchaProvider": captcha_provider,
+                "captchaApiKey": captcha_api_key,
             }),
         )
         .await?;
@@ -518,6 +534,10 @@ pub async fn run_action(
     }
 
     let proxy = load_proxy(&state.db, profile);
+    let humanize = {
+        let conn = state.db.0.lock().unwrap();
+        crate::db::get_settings(&conn).humanize_actions
+    };
 
     let client = ipc::client(&state.sidecar_exe, &state.sidecar_script).await;
     let call_result = client
@@ -534,6 +554,7 @@ pub async fn run_action(
                 "commentPool": comment_pool,
                 "dmMessage": dm_message,
                 "reactionType": reaction_type,
+                "humanize": humanize,
             }),
         )
         .await;

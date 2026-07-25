@@ -203,6 +203,9 @@ export type AppSettings = {
   backoff_cap_hours: number;
   warmup_enabled: boolean;
   max_pending_follows: number;
+  humanize_actions: boolean;
+  captcha_provider: string;
+  captcha_api_key: string;
 };
 
 export type ScheduledPost = {

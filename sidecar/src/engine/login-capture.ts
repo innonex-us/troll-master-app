@@ -1,6 +1,7 @@
 import type { BrowserContext, Page } from "playwright";
 import { closeContext, openContext } from "./browser.js";
 import { detectIssue } from "./detection.js";
+import { trySolveCaptcha } from "./captcha.js";
 import { instagramConfig } from "../platforms/instagram/config.js";
 import { twitterConfig } from "../platforms/twitter/config.js";
 import { facebookConfig } from "../platforms/facebook/config.js";
@@ -56,8 +57,11 @@ async function pollForSession(
   platform: LoginCaptureParams["platform"],
   sessionCookieName: string,
   storageStatePlainPath: string,
+  captchaProvider?: string,
+  captchaApiKey?: string,
 ): Promise<ActionResult> {
   const deadline = Date.now() + TIMEOUT_MS;
+  let captchaTried = false;
   while (Date.now() < deadline) {
     const cookies = await context.cookies();
     const loggedIn = cookies.some((c) => c.name === sessionCookieName);
@@ -69,6 +73,12 @@ async function pollForSession(
     const issue = await detectIssue(page, platform);
     if (issue?.issue === "banned") {
       return { status: "banned", message: issue.detail };
+    }
+
+    // If a reCAPTCHA is present and a solver is configured, try it once.
+    if (!captchaTried && captchaProvider && captchaApiKey) {
+      captchaTried = true;
+      await trySolveCaptcha(page, captchaProvider, captchaApiKey);
     }
 
     await sleep(POLL_INTERVAL_MS);
@@ -94,6 +104,8 @@ export async function runLoginCapture(params: LoginCaptureParams): Promise<Actio
       params.platform,
       config.sessionCookieName,
       params.storageStatePlainPath,
+      params.captchaProvider,
+      params.captchaApiKey,
     );
   } finally {
     await closeContext(opened);
@@ -132,6 +144,8 @@ export async function runAutoLogin(params: AutoLoginParams): Promise<ActionResul
       params.platform,
       config.sessionCookieName,
       params.storageStatePlainPath,
+      params.captchaProvider,
+      params.captchaApiKey,
     );
   } finally {
     await closeContext(opened);

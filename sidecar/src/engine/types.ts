@@ -22,6 +22,8 @@ export type LoginCaptureParams = {
   proxy?: ProxyConfig | null;
   fingerprint: FingerprintConfig;
   storageStatePlainPath: string;
+  captchaProvider?: string;
+  captchaApiKey?: string;
 };
 
 export type AutoLoginParams = LoginCaptureParams & {
@@ -118,6 +120,7 @@ export type ActionRunParams = {
   commentPool?: string[];
   dmMessage?: string;
   reactionType?: string;
+  humanize?: boolean;
 };
 
 export type ActionResult = {

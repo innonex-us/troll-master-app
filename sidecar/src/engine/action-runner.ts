@@ -1,6 +1,7 @@
 import type { Page } from "playwright";
 import { closeContext, openContext } from "./browser.js";
 import { detectIssue } from "./detection.js";
+import { preActionIdle } from "./humanize.js";
 import { resolveSpintax } from "./spintax.js";
 import * as instagram from "../platforms/instagram/actions.js";
 import * as twitter from "../platforms/twitter/actions.js";
@@ -233,6 +234,11 @@ export async function runAction(params: ActionRunParams): Promise<ActionResult> 
     const issue = await detectIssue(page, params.platform);
     if (issue) {
       return { status: issue.issue, message: issue.detail };
+    }
+
+    // Human-like idle before acting: scroll, mouse drift, think pause.
+    if (params.humanize !== false) {
+      await preActionIdle(page);
     }
 
     const result = await DISPATCH[params.platform](page, params);
