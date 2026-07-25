@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, Profile, ScheduledPost } from "../api";
+import { InfoButton } from "../components/InfoButton";
 import { Badge } from "../components/Badge";
 
 // YouTube publishing isn't automatable via web — hide it from the composer.
@@ -70,15 +71,18 @@ export function PublisherPage() {
     <div>
       <div className="page-header">
         <div>
-          <h1>Publisher</h1>
+          <div className="title-row">
+            <h1>Publisher</h1>
+            <InfoButton>
+              Publishing drives each platform's real web composer — best-effort and fragile; a
+              failed post keeps its error and won't retry. YouTube isn't supported (web upload
+              requires verification).
+            </InfoButton>
+          </div>
           <div className="sub">Schedule photos/videos + captions to auto-publish per profile</div>
         </div>
       </div>
       {error && <p className="error">{error}</p>}
-      <p className="sub">
-        Publishing drives each platform's real web composer — best-effort and fragile; a failed post
-        keeps its error and won't retry. YouTube isn't supported (web upload requires verification).
-      </p>
 
       <div className="panel">
         <h3>Schedule a post</h3>

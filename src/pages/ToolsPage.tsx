@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { api, Profile } from "../api";
+import { InfoButton } from "../components/InfoButton";
 
 type ScrapeKind = "followers_of" | "hashtag";
 
@@ -75,11 +76,13 @@ export function ToolsPage() {
       </div>
 
       <div className="panel">
-        <h3>Scrape &amp; Export</h3>
-        <p className="hint">
-          Runs under a chosen active profile's logged-in session. Best-effort per platform —
-          private or rate-limited accounts may return fewer results.
-        </p>
+        <div className="title-row">
+          <h3>Scrape &amp; Export</h3>
+          <InfoButton>
+            Runs under a chosen active profile's logged-in session. Best-effort per platform —
+            private or rate-limited accounts may return fewer results.
+          </InfoButton>
+        </div>
         <div className="row">
           <select value={profileId} onChange={(e) => setProfileId(e.target.value)}>
             <option value="">Select active profile…</option>

@@ -4,6 +4,7 @@ import { api, Campaign, Profile, ProfileGroup } from "../api";
 import { CampaignRulesPanel } from "./CampaignRulesPanel";
 import { Badge } from "../components/Badge";
 import { Modal } from "../components/Modal";
+import { InfoButton } from "../components/InfoButton";
 
 export function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -136,11 +137,14 @@ export function CampaignsPage() {
     <div>
       <div className="page-header">
         <div>
-          <h1>Campaigns</h1>
-          <div className="sub">
-            Shared rule definitions — enroll profiles to run them live. Editing a campaign updates
-            every enrolled profile immediately.
+          <div className="title-row">
+            <h1>Campaigns</h1>
+            <InfoButton>
+              Shared rule definitions — enroll profiles to run them live. Editing a campaign updates
+              every enrolled profile immediately.
+            </InfoButton>
           </div>
+          <div className="sub">Shared rule definitions — enroll profiles to run them live</div>
         </div>
         <div className="row">
           <button type="button" onClick={exportCampaigns}>

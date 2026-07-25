@@ -3,6 +3,7 @@ import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, Pod, PodEngagement, PodPost, Profile, ProfileGroup } from "../api";
 import { Badge } from "../components/Badge";
 import { Modal } from "../components/Modal";
+import { InfoButton } from "../components/InfoButton";
 
 const ALL_ACTIONS = ["like", "comment"];
 
@@ -152,11 +153,14 @@ export function PodsPage() {
     <div>
       <div className="page-header">
         <div>
-          <h1>Pods</h1>
-          <div className="sub">
-            Mutual engagement groups — enroll your own profiles, and whenever one publishes
-            something new, the rest automatically like/comment it within a set time window.
+          <div className="title-row">
+            <h1>Pods</h1>
+            <InfoButton>
+              Mutual engagement groups — enroll your own profiles, and whenever one publishes
+              something new, the rest automatically like/comment it within a set time window.
+            </InfoButton>
           </div>
+          <div className="sub">Mutual engagement groups across your own profiles</div>
         </div>
         <div className="row">
           <button type="button" onClick={exportPods}>

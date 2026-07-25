@@ -7,6 +7,7 @@ import { BulkToolbar } from "../components/BulkToolbar";
 import { BulkRuleModal } from "../components/BulkRuleModal";
 import { PlatformIconRail } from "../components/PlatformIconRail";
 import { ProfileDetailModal } from "../components/ProfileDetailModal";
+import { InfoButton } from "../components/InfoButton";
 
 const VALID_PLATFORMS: Platform[] = ["instagram", "twitter", "facebook", "tiktok", "linkedin", "youtube"];
 
@@ -314,8 +315,15 @@ export function ProfilesPage() {
     <div>
       <div className="page-header">
         <div>
-          <h1>Profiles</h1>
-          <div className="sub">Social accounts under management</div>
+          <div className="title-row">
+            <h1>Profiles</h1>
+            <InfoButton>
+              Social accounts under management. Pick a platform on the left to filter. CSV import
+              expects a header row <code>platform,username,display_name,proxy_label,group_name,device_name</code>{" "}
+              (only platform + username required) and creates profile shells that each need a login
+              afterward.
+            </InfoButton>
+          </div>
         </div>
         <div className="row">
           <button type="button" onClick={exportProfiles}>
@@ -348,10 +356,6 @@ export function ProfilesPage() {
       </div>
       {error && <p className="error">{error}</p>}
       {backupStatus && <p className="hint">{backupStatus}</p>}
-      <p className="sub">
-        CSV: header row platform,username,display_name,proxy_label,group_name,device_name (only
-        platform+username required) — creates profile shells needing individual login after.
-      </p>
 
       <div className="panel">
         <h3>Groups</h3>
@@ -492,7 +496,6 @@ export function ProfilesPage() {
                     </td>
                     <td>
                       <div className="hint">{p.device_name || "unnamed"}</div>
-                      <div className="hint">{p.device_id}</div>
                     </td>
                     <td>
                       <select value={p.group_id ?? ""} onChange={(e) => assignGroup(p.id, e.target.value)}>
@@ -591,13 +594,15 @@ export function ProfilesPage() {
                 </option>
               ))}
             </select>
-            <button type="submit" className="primary">
-              Add Profile
-            </button>
+            <div className="title-row">
+              <button type="submit" className="primary">
+                Add Profile
+              </button>
+              <InfoButton>
+                Device name, screen size, and device identity are assigned automatically.
+              </InfoButton>
+            </div>
           </form>
-          <p className="hint">
-            Device name, screen size, and device identity are assigned automatically.
-          </p>
         </Modal>
       )}
 

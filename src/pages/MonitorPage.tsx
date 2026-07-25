@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, CommentReplyRule, MonitoredPost, MonitoredPostSnapshot, Platform, Profile } from "../api";
 import { Modal } from "../components/Modal";
+import { InfoButton } from "../components/InfoButton";
 
 function formatMetric(value: number | null): string {
   return value === null || value === undefined ? "—" : value.toLocaleString();
@@ -134,11 +135,14 @@ export function MonitorPage() {
     <div>
       <div className="page-header">
         <div>
-          <h1>Monitor</h1>
-          <div className="sub">
-            Track engagement on other people's posts over time — competitors, target content,
-            anything public. Scraped every ~30 min using a viewer account's logged-in session.
+          <div className="title-row">
+            <h1>Monitor</h1>
+            <InfoButton>
+              Track engagement on other people's posts over time — competitors, target content,
+              anything public. Scraped every ~30 min using a viewer account's logged-in session.
+            </InfoButton>
           </div>
+          <div className="sub">Track engagement on other people's posts over time</div>
         </div>
         <button type="button" className="primary" onClick={() => setShowAdd(true)}>
           + Track Post

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "r
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, NewProxy, Proxy } from "../api";
 import { Modal } from "../components/Modal";
+import { InfoButton } from "../components/InfoButton";
 
 /**
  * Accepts either a header CSV ("label,protocol,host,port,username,password")
@@ -155,9 +156,16 @@ export function ProxiesPage() {
     <div>
       <div className="page-header">
         <div>
-          <h1>Proxies</h1>
+          <div className="title-row">
+            <h1>Proxies</h1>
+            <InfoButton>
+              Assign one proxy per profile to keep sessions isolated. Export includes proxy
+              credentials in plaintext — handle the file accordingly. CSV/TXT import takes one proxy
+              per line as <code>host:port</code> or <code>host:port:username:password</code>, or a
+              CSV with a header row <code>label,protocol,host,port,username,password</code>.
+            </InfoButton>
+          </div>
           <div className="sub">Assign one proxy per profile to keep sessions isolated</div>
-          <div className="sub">Export includes proxy credentials in plaintext — handle the file accordingly.</div>
         </div>
         <div className="row">
           <button type="button" onClick={exportProxies}>
@@ -183,10 +191,6 @@ export function ProxiesPage() {
       </div>
       {error && <p className="error">{error}</p>}
       {backupStatus && <p className="hint">{backupStatus}</p>}
-      <p className="sub">
-        CSV/TXT: one proxy per line as "host:port" or "host:port:username:password", or a CSV with a
-        header row (label,protocol,host,port,username,password).
-      </p>
 
       <div className="panel">
       <table className="mini-table">

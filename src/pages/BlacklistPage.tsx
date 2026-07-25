@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, BlacklistEntry } from "../api";
+import { InfoButton } from "../components/InfoButton";
 
 function parseUsernameFile(text: string): string[] {
   return text
@@ -94,11 +95,15 @@ export function BlacklistPage() {
     <div>
       <div className="page-header">
         <div>
-          <h1>Blacklist</h1>
-          <div className="sub">
-            Usernames automation will never target, across every profile — checked before every
-            follow/unfollow/like/comment/DM attempt
+          <div className="title-row">
+            <h1>Blacklist</h1>
+            <InfoButton>
+              Usernames automation will never target, across every profile — checked before every
+              follow/unfollow/like/comment/DM attempt. TXT import takes one username per line (with
+              or without @).
+            </InfoButton>
           </div>
+          <div className="sub">Usernames automation will never target, across every profile</div>
         </div>
         <div className="row">
           <button type="button" onClick={exportBlacklist}>
@@ -121,7 +126,6 @@ export function BlacklistPage() {
       </div>
       {error && <p className="error">{error}</p>}
       {backupStatus && <p className="hint">{backupStatus}</p>}
-      <p className="sub">TXT: one username per line (with or without @).</p>
 
       <form className="row panel" onSubmit={addEntry}>
         <input
