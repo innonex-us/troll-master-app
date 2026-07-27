@@ -212,6 +212,11 @@ export function ProfileDetailModal({
             Viewport: {profile.viewport_width}×{profile.viewport_height}
           </p>
           <p className="hint">User agent: {profile.user_agent}</p>
+          <p className="hint">Platform: {profile.os_platform}</p>
+          <p className="hint">
+            Hardware: {profile.hardware_concurrency}-core, {profile.device_memory}GB
+          </p>
+          <p className="hint">GPU: {profile.webgl_renderer}</p>
           <p className="hint">Status: {profile.status}</p>
           <p className="hint">Created: {new Date(profile.created_at).toLocaleString()}</p>
         </div>

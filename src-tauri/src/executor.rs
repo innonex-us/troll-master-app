@@ -19,12 +19,21 @@ fn proxy_json(proxy: &Option<Proxy>) -> Value {
 }
 
 fn fingerprint_json(profile: &Profile) -> Value {
+    let languages: Value = serde_json::from_str(&profile.nav_languages)
+        .unwrap_or_else(|_| json!(["en-US", "en"]));
     json!({
         "userAgent": profile.user_agent,
+        "platform": profile.os_platform,
         "timezone": profile.timezone,
         "locale": profile.locale,
+        "languages": languages,
         "viewportWidth": profile.viewport_width,
         "viewportHeight": profile.viewport_height,
+        "hardwareConcurrency": profile.hardware_concurrency,
+        "deviceMemory": profile.device_memory,
+        "webglVendor": profile.webgl_vendor,
+        "webglRenderer": profile.webgl_renderer,
+        "canvasSeed": profile.canvas_seed,
     })
 }
 

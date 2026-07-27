@@ -8,10 +8,17 @@ export type ProxyConfig = {
 
 export type FingerprintConfig = {
   userAgent: string;
+  platform: string;
   timezone: string;
   locale: string;
+  languages: string[];
   viewportWidth: number;
   viewportHeight: number;
+  hardwareConcurrency: number;
+  deviceMemory: number;
+  webglVendor: string;
+  webglRenderer: string;
+  canvasSeed: string;
 };
 
 export type Platform = "instagram" | "twitter" | "facebook" | "tiktok" | "linkedin" | "youtube";

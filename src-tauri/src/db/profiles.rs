@@ -19,6 +19,13 @@ pub struct Profile {
     pub group_id: Option<String>,
     pub device_name: String,
     pub device_id: String,
+    pub os_platform: String,
+    pub nav_languages: String,
+    pub hardware_concurrency: i64,
+    pub device_memory: i64,
+    pub webgl_vendor: String,
+    pub webgl_renderer: String,
+    pub canvas_seed: String,
     /// Manual pause switch, independent of `status` (which is scheduler/login-lifecycle
     /// managed). A disabled profile is skipped by every scheduler tick regardless of status.
     pub enabled: bool,
@@ -57,6 +64,13 @@ fn row_to_profile(row: &rusqlite::Row) -> rusqlite::Result<Profile> {
         group_id: row.get("group_id")?,
         device_name: row.get("device_name")?,
         device_id: row.get("device_id")?,
+        os_platform: row.get("os_platform")?,
+        nav_languages: row.get("nav_languages")?,
+        hardware_concurrency: row.get("hardware_concurrency")?,
+        device_memory: row.get("device_memory")?,
+        webgl_vendor: row.get("webgl_vendor")?,
+        webgl_renderer: row.get("webgl_renderer")?,
+        canvas_seed: row.get("canvas_seed")?,
         enabled: row.get::<_, i64>("enabled")? != 0,
         has_password: row.get::<_, Option<String>>("login_password_enc")?.is_some(),
         created_at: row.get("created_at")?,
@@ -73,8 +87,8 @@ pub fn insert_profile(
     let now = chrono::Utc::now().to_rfc3339();
     let device_id = crate::fingerprint::generate_device_id();
     conn.execute(
-        "INSERT INTO profiles (id, platform, display_name, username, proxy_id, timezone, locale, user_agent, viewport_width, viewport_height, storage_state_enc_path, status, device_name, device_id, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, 'needs_login', ?11, ?12, ?13, ?13)",
+        "INSERT INTO profiles (id, platform, display_name, username, proxy_id, timezone, locale, user_agent, viewport_width, viewport_height, storage_state_enc_path, status, device_name, device_id, os_platform, nav_languages, hardware_concurrency, device_memory, webgl_vendor, webgl_renderer, canvas_seed, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, 'needs_login', ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?20)",
         params![
             id,
             new.platform,
@@ -88,6 +102,13 @@ pub fn insert_profile(
             fp.viewport_height,
             new.device_name,
             device_id,
+            fp.os_platform,
+            fp.nav_languages,
+            fp.hardware_concurrency,
+            fp.device_memory,
+            fp.webgl_vendor,
+            fp.webgl_renderer,
+            fp.canvas_seed,
             now,
         ],
     )?;
@@ -159,6 +180,13 @@ pub fn duplicate_profile(conn: &Connection, source_id: &str) -> rusqlite::Result
         locale: source.locale.clone(),
         viewport_width: source.viewport_width,
         viewport_height: source.viewport_height,
+        os_platform: source.os_platform.clone(),
+        nav_languages: source.nav_languages.clone(),
+        hardware_concurrency: source.hardware_concurrency,
+        device_memory: source.device_memory,
+        webgl_vendor: source.webgl_vendor.clone(),
+        webgl_renderer: source.webgl_renderer.clone(),
+        canvas_seed: source.canvas_seed.clone(),
     };
 
     let cloned = insert_profile(conn, &new, &fp)?;

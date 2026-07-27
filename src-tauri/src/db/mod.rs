@@ -36,7 +36,7 @@ pub use rules::*;
 pub use settings::*;
 pub use welcome_dm::*;
 
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -382,6 +382,59 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         add_column_if_missing(conn, table, "active_hours_start", "INTEGER NOT NULL DEFAULT 0")?;
         add_column_if_missing(conn, table, "active_hours_end", "INTEGER NOT NULL DEFAULT 24")?;
         add_column_if_missing(conn, table, "active_days", "TEXT NOT NULL DEFAULT '[1,2,3,4,5,6,7]'")?;
+    }
+    // Extended fingerprint fields (navigator.platform/languages/hardwareConcurrency/
+    // deviceMemory, WebGL vendor/renderer, canvas noise seed) backing the sidecar's
+    // stealth init script. Named `os_platform`/`nav_languages` to avoid colliding with
+    // the existing `platform` column (the social network, e.g. "instagram").
+    add_column_if_missing(conn, "profiles", "os_platform", "TEXT NOT NULL DEFAULT 'Win32'")?;
+    add_column_if_missing(conn, "profiles", "nav_languages", "TEXT NOT NULL DEFAULT '[\"en-US\",\"en\"]'")?;
+    add_column_if_missing(conn, "profiles", "hardware_concurrency", "INTEGER NOT NULL DEFAULT 8")?;
+    add_column_if_missing(conn, "profiles", "device_memory", "INTEGER NOT NULL DEFAULT 8")?;
+    add_column_if_missing(conn, "profiles", "webgl_vendor", "TEXT NOT NULL DEFAULT 'Google Inc. (Intel)'")?;
+    add_column_if_missing(
+        conn,
+        "profiles",
+        "webgl_renderer",
+        "TEXT NOT NULL DEFAULT 'ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)'",
+    )?;
+    add_column_if_missing(conn, "profiles", "canvas_seed", "TEXT NOT NULL DEFAULT ''")?;
+    backfill_fingerprint_fields(conn)?;
+    Ok(())
+}
+
+/// One-time backfill for profiles created before the extended fingerprint columns
+/// existed. The column defaults added above are a single fixed value (Win32/Intel/
+/// en-US) for every row, which would give a pre-existing Mac or Linux profile a
+/// mismatched `os_platform`/WebGL pair — so every row still holding the placeholder
+/// empty `canvas_seed` gets its platform/GPU derived from its own `user_agent`,
+/// its languages derived from its own `locale`, and fresh random hardware/canvas
+/// values, instead of all converging on the same defaults.
+fn backfill_fingerprint_fields(conn: &Connection) -> rusqlite::Result<()> {
+    let mut stmt = conn.prepare("SELECT id, user_agent, locale FROM profiles WHERE canvas_seed = ''")?;
+    let rows: Vec<(String, String, String)> = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+
+    for (id, user_agent, locale) in rows {
+        let (os_platform, webgl_vendor, webgl_renderer) = crate::fingerprint::infer_os_and_gpu(&user_agent);
+        let nav_languages = crate::fingerprint::languages_json(&locale);
+        let (hardware_concurrency, device_memory) = crate::fingerprint::random_hardware();
+        let canvas_seed = crate::fingerprint::random_canvas_seed();
+        conn.execute(
+            "UPDATE profiles SET os_platform = ?1, webgl_vendor = ?2, webgl_renderer = ?3, nav_languages = ?4, hardware_concurrency = ?5, device_memory = ?6, canvas_seed = ?7 WHERE id = ?8",
+            params![
+                os_platform,
+                webgl_vendor,
+                webgl_renderer,
+                nav_languages,
+                hardware_concurrency,
+                device_memory,
+                canvas_seed,
+                id,
+            ],
+        )?;
     }
     Ok(())
 }

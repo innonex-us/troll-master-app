@@ -52,6 +52,13 @@ export type Profile = {
   group_id: string | null;
   device_name: string;
   device_id: string;
+  os_platform: string;
+  nav_languages: string;
+  hardware_concurrency: number;
+  device_memory: number;
+  webgl_vendor: string;
+  webgl_renderer: string;
+  canvas_seed: string;
   enabled: boolean;
   has_password: boolean;
   created_at: string;

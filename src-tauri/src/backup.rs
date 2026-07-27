@@ -24,6 +24,13 @@ pub struct ProfileExport {
     pub user_agent: String,
     pub viewport_width: i64,
     pub viewport_height: i64,
+    pub os_platform: String,
+    pub nav_languages: String,
+    pub hardware_concurrency: i64,
+    pub device_memory: i64,
+    pub webgl_vendor: String,
+    pub webgl_renderer: String,
+    pub canvas_seed: String,
     pub enabled: bool,
 }
 
@@ -148,6 +155,13 @@ pub fn export_bundle(conn: &Connection) -> rusqlite::Result<BackupBundle> {
             user_agent: p.user_agent,
             viewport_width: p.viewport_width,
             viewport_height: p.viewport_height,
+            os_platform: p.os_platform,
+            nav_languages: p.nav_languages,
+            hardware_concurrency: p.hardware_concurrency,
+            device_memory: p.device_memory,
+            webgl_vendor: p.webgl_vendor,
+            webgl_renderer: p.webgl_renderer,
+            canvas_seed: p.canvas_seed,
             enabled: p.enabled,
         })
         .collect();
@@ -306,6 +320,13 @@ pub fn import_bundle(
             locale: p.locale.clone(),
             viewport_width: p.viewport_width,
             viewport_height: p.viewport_height,
+            os_platform: p.os_platform.clone(),
+            nav_languages: p.nav_languages.clone(),
+            hardware_concurrency: p.hardware_concurrency,
+            device_memory: p.device_memory,
+            webgl_vendor: p.webgl_vendor.clone(),
+            webgl_renderer: p.webgl_renderer.clone(),
+            canvas_seed: p.canvas_seed.clone(),
         };
         let created = db::insert_profile(&tx, &new, &fp)?;
         if let Some(new_group_id) = p.old_group_id.as_ref().and_then(|old| group_ids.get(old)) {
@@ -497,6 +518,13 @@ pub fn import_profiles_bundle(
             locale: p.locale.clone(),
             viewport_width: p.viewport_width,
             viewport_height: p.viewport_height,
+            os_platform: p.os_platform.clone(),
+            nav_languages: p.nav_languages.clone(),
+            hardware_concurrency: p.hardware_concurrency,
+            device_memory: p.device_memory,
+            webgl_vendor: p.webgl_vendor.clone(),
+            webgl_renderer: p.webgl_renderer.clone(),
+            canvas_seed: p.canvas_seed.clone(),
         };
         let created = db::insert_profile(&tx, &new, &fp)?;
         if group_id.is_some() {
